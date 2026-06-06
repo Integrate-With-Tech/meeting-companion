@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign In – Meeting Companion</title>
+</head>
+<body>
+  <h1>Sign In to Meeting Companion</h1>
+
+  {% if magic_link_sent %}
+  <p>
+    Magic link sent to <strong>{{ email }}</strong>. Check your inbox and click
+    the link to sign in.
+  </p>
+  {% else %}
+
+  <h2>Email Magic Link</h2>
+  <form method="post" action="/auth/sign-in/magic-link">
+    <label>
+      Email address
+      <input type="email" name="email" required placeholder="you@example.com" />
+    </label>
+    <button type="submit">Send Magic Link</button>
+  </form>
+
+  <h2>Social Login</h2>
+  <ul>
+    <li><a href="/auth/sign-in/social?provider=google">Sign in with Google</a></li>
+    <li><a href="/auth/sign-in/social?provider=github">Sign in with GitHub</a></li>
+  </ul>
+
+  <p>
+    <em>
+      Note: signing in to Meeting Companion is separate from connecting a
+      Microsoft / Azure AD account. You can link your Microsoft account from
+      the <a href="/auth/account">Account</a> page after signing in.
+    </em>
+  </p>
+
+  {% endif %}
+
+  <p><a href="/">Home</a></p>
+</body>
+</html>

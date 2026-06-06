@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Account – Meeting Companion</title>
+</head>
+<body>
+  <h1>My Account</h1>
+
+  {% if disconnected %}
+  <p>Microsoft account disconnected successfully.</p>
+  {% endif %}
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Product Identity (Supabase Auth)                                    -->
+  <!-- ------------------------------------------------------------------ -->
+  <h2>Product Identity</h2>
+  {% if profile %}
+  <p>Email: {{ profile.email }}</p>
+  <p>Display name: {{ profile.display_name }}</p>
+  {% else %}
+  <p>No profile found. <a href="/auth/sign-in">Sign in</a> to create one.</p>
+  {% endif %}
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Microsoft Integration                                               -->
+  <!-- ------------------------------------------------------------------ -->
+  <h2>Microsoft Integration</h2>
+  <p>
+    Connecting a Microsoft account enables Teams transcript ingestion and
+    optional SharePoint note saving. This is separate from your Meeting
+    Companion login.
+  </p>
+
+  {% if microsoft_connections %}
+  <p>Status: <strong>Connected</strong></p>
+  {% for conn in microsoft_connections %}
+  <div>
+    <p>Account: {{ conn.display_name }} ({{ conn.email }})</p>
+    {% if conn.tenant_id %}<p>Tenant: {{ conn.tenant_id }}</p>{% endif %}
+    <form method="post" action="/auth/microsoft/disconnect">
+      <input type="hidden" name="user_id" value="{{ user_id }}" />
+      <input type="hidden" name="connection_id" value="{{ conn.id }}" />
+      <button type="submit">Disconnect</button>
+    </form>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p>Status: <strong>Not connected</strong></p>
+  <p>
+    <a href="/auth/microsoft/connect?user_id={{ user_id }}">
+      Connect Microsoft Account
+    </a>
+  </p>
+  {% endif %}
+
+  <p>
+    <a href="/notes/history?viewer_id={{ user_id }}">My Notes</a> |
+    <a href="/">Home</a>
+  </p>
+</body>
+</html>

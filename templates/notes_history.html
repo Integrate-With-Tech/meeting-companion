@@ -6,6 +6,16 @@
 </head>
 <body>
   <h1>Notes History</h1>
+
+  {% if viewer_id and not microsoft_connected %}
+  <p>
+    <strong>Microsoft account not connected.</strong>
+    Teams transcript ingestion and SharePoint saves require a connected
+    Microsoft account.
+    <a href="/auth/account?user_id={{ viewer_id }}">Connect now</a>
+  </p>
+  {% endif %}
+
   <form method="get" action="/notes/history">
     <input type="hidden" name="tenant_id" value="{{ tenant_id }}" />
     <input type="hidden" name="viewer_id" value="{{ viewer_id }}" />
@@ -45,5 +55,10 @@
       {% endfor %}
     </tbody>
   </table>
+
+  {% if viewer_id %}
+  <p><a href="/auth/account?user_id={{ viewer_id }}">My Account</a></p>
+  {% endif %}
+  <p><a href="/">Home</a></p>
 </body>
 </html>
