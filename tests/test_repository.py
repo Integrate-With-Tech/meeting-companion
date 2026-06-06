@@ -386,6 +386,25 @@ class TestSharePointUploadRepository(unittest.TestCase):
         result = repo.list_by_job("job-1")
         self.assertEqual(len(result), 2)
 
+    def test_create_allows_failed_upload_without_item_id(self):
+        row = {"id": "sp-failed", "upload_status": "failed"}
+        client, chain = _mock_client(row)
+        repo = SharePointUploadRepository(client)
+        repo.create(
+            SharePointUpload(
+                meeting_job_id="job-1",
+                sharepoint_item_id=None,
+                upload_status="failed",
+                error_message="graph timeout",
+                content_hash="abc123",
+            )
+        )
+        inserted = chain.insert.call_args[0][0]
+        self.assertIsNone(inserted.get("sharepoint_item_id"))
+        self.assertEqual(inserted["upload_status"], "failed")
+        self.assertEqual(inserted["error_message"], "graph timeout")
+        self.assertEqual(inserted["content_hash"], "abc123")
+
 
 # ---------------------------------------------------------------------------
 # AuditEventRepository
@@ -534,10 +553,14 @@ class TestModels(unittest.TestCase):
         self.assertEqual(u.display_name, "Alice")
 
     def test_sharepoint_upload_optional_fields(self):
-        upload = SharePointUpload(meeting_job_id="job-1", sharepoint_item_id="item-1")
+        upload = SharePointUpload(meeting_job_id="job-1")
+        self.assertIsNone(upload.sharepoint_item_id)
         self.assertIsNone(upload.web_url)
         self.assertIsNone(upload.drive_id)
         self.assertIsNone(upload.site_id)
+        self.assertIsNone(upload.content_hash)
+        self.assertEqual(upload.upload_status, "pending")
+        self.assertIsNone(upload.error_message)
 
 
 if __name__ == "__main__":
