@@ -23,18 +23,22 @@ from services.db.models import (
     GeneratedNotes,
     MeetingArtifact,
     MeetingJob,
+    MicrosoftConnection,
     SharePointUpload,
     TenantSettings,
     UserIdentity,
+    UserProfile,
 )
 from services.db.repository import (
     AuditEventRepository,
     GeneratedNotesRepository,
     MeetingArtifactRepository,
     MeetingJobRepository,
+    MicrosoftConnectionRepository,
     SharePointUploadRepository,
     TenantSettingsRepository,
     UserIdentityRepository,
+    UserProfileRepository,
     _strip_nones,
 )
 
@@ -565,3 +569,220 @@ class TestModels(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# UserProfileRepository
+# ---------------------------------------------------------------------------
+
+
+class TestUserProfileRepository(unittest.TestCase):
+
+    def test_upsert_returns_row(self):
+        row = {"id": "user-uuid-1", "email": "alice@example.com", "display_name": "Alice"}
+        client, chain = _mock_client(row)
+        repo = UserProfileRepository(client)
+        result = repo.upsert(UserProfile(id="user-uuid-1", email="alice@example.com", display_name="Alice"))
+        self.assertEqual(result["id"], "user-uuid-1")
+        chain.upsert.assert_called_once()
+
+    def test_upsert_uses_id_conflict_target(self):
+        row = {"id": "user-uuid-1"}
+        client, chain = _mock_client(row)
+        repo = UserProfileRepository(client)
+        repo.upsert(UserProfile(id="user-uuid-1"))
+        _, kwargs = chain.upsert.call_args
+        self.assertEqual(kwargs.get("on_conflict"), "id")
+
+    def test_get_returns_row(self):
+        row = {"id": "user-uuid-1", "email": "alice@example.com"}
+        client, chain = _mock_client(row)
+        chain.execute.return_value = _ok(row)
+        repo = UserProfileRepository(client)
+        result = repo.get("user-uuid-1")
+        self.assertEqual(result["id"], "user-uuid-1")
+
+    def test_upsert_strips_nones(self):
+        row = {"id": "user-uuid-1"}
+        client, chain = _mock_client(row)
+        repo = UserProfileRepository(client)
+        repo.upsert(UserProfile(id="user-uuid-1"))
+        payload = chain.upsert.call_args[0][0]
+        self.assertNotIn("email", payload)
+        self.assertNotIn("display_name", payload)
+
+
+# ---------------------------------------------------------------------------
+# MicrosoftConnectionRepository
+# ---------------------------------------------------------------------------
+
+
+class TestMicrosoftConnectionRepository(unittest.TestCase):
+
+    def _make_connection(self, **overrides):
+        base = {
+            "id": "conn-1",
+            "owner_user_id": "user-uuid-1",
+            "microsoft_user_oid": "ms-oid-1",
+            "email": "alice@contoso.com",
+        }
+        base.update(overrides)
+        return base
+
+    def test_upsert_returns_row(self):
+        row = self._make_connection()
+        client, chain = _mock_client(row)
+        repo = MicrosoftConnectionRepository(client)
+        result = repo.upsert(
+            MicrosoftConnection(owner_user_id="user-uuid-1", microsoft_user_oid="ms-oid-1")
+        )
+        self.assertEqual(result["owner_user_id"], "user-uuid-1")
+        chain.upsert.assert_called_once()
+
+    def test_upsert_conflict_target(self):
+        row = self._make_connection()
+        client, chain = _mock_client(row)
+        repo = MicrosoftConnectionRepository(client)
+        repo.upsert(MicrosoftConnection(owner_user_id="user-uuid-1", microsoft_user_oid="ms-oid-1"))
+        _, kwargs = chain.upsert.call_args
+        self.assertEqual(kwargs.get("on_conflict"), "owner_user_id,microsoft_user_oid")
+
+    def test_get_returns_row(self):
+        row = self._make_connection()
+        client, chain = _mock_client(row)
+        chain.execute.return_value = _ok(row)
+        repo = MicrosoftConnectionRepository(client)
+        result = repo.get("conn-1")
+        self.assertEqual(result["id"], "conn-1")
+
+    def test_get_by_user_and_oid(self):
+        row = self._make_connection()
+        client, chain = _mock_client(row)
+        chain.execute.return_value = _ok(row)
+        repo = MicrosoftConnectionRepository(client)
+        result = repo.get_by_user_and_oid("user-uuid-1", "ms-oid-1")
+        self.assertEqual(result["microsoft_user_oid"], "ms-oid-1")
+        calls = [str(c) for c in chain.eq.call_args_list]
+        self.assertTrue(any("ms-oid-1" in c for c in calls))
+
+    def test_list_by_user(self):
+        rows = [self._make_connection(), self._make_connection(id="conn-2")]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = MicrosoftConnectionRepository(client)
+        result = repo.list_by_user("user-uuid-1")
+        self.assertEqual(len(result), 2)
+
+    def test_delete_calls_delete(self):
+        client, chain = _mock_client()
+        repo = MicrosoftConnectionRepository(client)
+        repo.delete("conn-1")
+        chain.delete.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# list_by_user tests for user-scoped repositories
+# ---------------------------------------------------------------------------
+
+
+class TestMeetingJobRepositoryListByUser(unittest.TestCase):
+
+    def test_list_by_user_returns_rows(self):
+        rows = [{"id": "job-1", "owner_user_id": "user-1"}, {"id": "job-2", "owner_user_id": "user-1"}]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = MeetingJobRepository(client)
+        result = repo.list_by_user("user-1")
+        self.assertEqual(len(result), 2)
+
+    def test_list_by_user_with_status_filter(self):
+        rows = [{"id": "job-1", "owner_user_id": "user-1", "status": "completed"}]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = MeetingJobRepository(client)
+        result = repo.list_by_user("user-1", status="completed")
+        self.assertEqual(len(result), 1)
+        calls = [str(c) for c in chain.eq.call_args_list]
+        self.assertTrue(any("completed" in c for c in calls))
+
+    def test_list_by_user_invalid_status_raises(self):
+        client, _ = _mock_client()
+        repo = MeetingJobRepository(client)
+        with self.assertRaises(ValueError):
+            repo.list_by_user("user-1", status="not_a_status")
+
+
+class TestMeetingArtifactRepositoryListByUser(unittest.TestCase):
+
+    def test_list_by_user_returns_rows(self):
+        rows = [{"id": "art-1", "owner_user_id": "user-1"}]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = MeetingArtifactRepository(client)
+        result = repo.list_by_user("user-1")
+        self.assertEqual(len(result), 1)
+
+
+class TestGeneratedNotesRepositoryListByUser(unittest.TestCase):
+
+    def test_list_by_user_returns_rows(self):
+        rows = [{"id": "notes-1", "owner_user_id": "user-1"}]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = GeneratedNotesRepository(client)
+        result = repo.list_by_user("user-1")
+        self.assertEqual(len(result), 1)
+
+
+class TestSharePointUploadRepositoryListByUser(unittest.TestCase):
+
+    def test_list_by_user_returns_rows(self):
+        rows = [{"id": "sp-1", "owner_user_id": "user-1"}, {"id": "sp-2", "owner_user_id": "user-1"}]
+        client, chain = _mock_client()
+        chain.execute.return_value = _ok(rows)
+        repo = SharePointUploadRepository(client)
+        result = repo.list_by_user("user-1")
+        self.assertEqual(len(result), 2)
+
+
+# ---------------------------------------------------------------------------
+# Model dataclass tests – owner_user_id / new fields
+# ---------------------------------------------------------------------------
+
+
+class TestOwnerUserIdModels(unittest.TestCase):
+
+    def test_meeting_job_owner_user_id_defaults_none(self):
+        job = MeetingJob(tenant_id="t1")
+        self.assertIsNone(job.owner_user_id)
+
+    def test_meeting_job_accepts_owner_user_id(self):
+        job = MeetingJob(tenant_id="t1", owner_user_id="user-uuid-1")
+        self.assertEqual(job.owner_user_id, "user-uuid-1")
+
+    def test_meeting_artifact_owner_user_id_defaults_none(self):
+        art = MeetingArtifact(meeting_job_id="job-1", artifact_type="transcript", storage_path="/p")
+        self.assertIsNone(art.owner_user_id)
+
+    def test_generated_notes_owner_user_id_defaults_none(self):
+        notes = GeneratedNotes(meeting_job_id="job-1")
+        self.assertIsNone(notes.owner_user_id)
+
+    def test_sharepoint_upload_owner_user_id_defaults_none(self):
+        upload = SharePointUpload(meeting_job_id="job-1")
+        self.assertIsNone(upload.owner_user_id)
+
+    def test_user_profile_fields(self):
+        p = UserProfile(id="user-uuid-1", email="a@b.com", display_name="Alice")
+        self.assertEqual(p.id, "user-uuid-1")
+        self.assertEqual(p.email, "a@b.com")
+        self.assertEqual(p.display_name, "Alice")
+        self.assertIsNone(p.created_at)
+
+    def test_microsoft_connection_fields(self):
+        conn = MicrosoftConnection(owner_user_id="user-1", microsoft_user_oid="ms-oid-1")
+        self.assertEqual(conn.owner_user_id, "user-1")
+        self.assertEqual(conn.microsoft_user_oid, "ms-oid-1")
+        self.assertIsNone(conn.access_token)
+        self.assertIsNone(conn.refresh_token)
+        self.assertIsNone(conn.scopes)

@@ -38,15 +38,98 @@ from services.db.models import (
     GeneratedNotes,
     MeetingArtifact,
     MeetingJob,
+    MicrosoftConnection,
     SharePointUpload,
     TenantSettings,
     UserIdentity,
+    UserProfile,
 )
 
 
 def _strip_nones(d: Dict[str, Any]) -> Dict[str, Any]:
     """Return a copy of *d* with all ``None``-valued keys removed."""
     return {k: v for k, v in d.items() if v is not None}
+
+
+# ---------------------------------------------------------------------------
+# UserProfileRepository
+# ---------------------------------------------------------------------------
+
+
+class UserProfileRepository:
+    """CRUD operations for the ``profiles`` table."""
+
+    TABLE = "profiles"
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def upsert(self, profile: UserProfile) -> Dict[str, Any]:
+        """Insert or update a user profile row.
+
+        Uses ``id`` (Supabase auth user UUID) as the conflict target.
+        """
+        payload = _strip_nones(asdict(profile))
+        result = self._client.table(self.TABLE).upsert(payload, on_conflict="id").execute()
+        return result.data[0]
+
+    def get(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return the profile row for *user_id*, or ``None`` if absent."""
+        result = self._client.table(self.TABLE).select("*").eq("id", user_id).maybe_single().execute()
+        return result.data
+
+
+# ---------------------------------------------------------------------------
+# MicrosoftConnectionRepository
+# ---------------------------------------------------------------------------
+
+
+class MicrosoftConnectionRepository:
+    """CRUD operations for the ``microsoft_connections`` table."""
+
+    TABLE = "microsoft_connections"
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def upsert(self, connection: MicrosoftConnection) -> Dict[str, Any]:
+        """Insert or update a Microsoft connection row.
+
+        Uses ``(owner_user_id, microsoft_user_oid)`` as the conflict target.
+        """
+        payload = _strip_nones(asdict(connection))
+        result = (
+            self._client.table(self.TABLE)
+            .upsert(payload, on_conflict="owner_user_id,microsoft_user_oid")
+            .execute()
+        )
+        return result.data[0]
+
+    def get(self, connection_id: str) -> Optional[Dict[str, Any]]:
+        """Return the connection row for *connection_id*, or ``None``."""
+        result = self._client.table(self.TABLE).select("*").eq("id", connection_id).maybe_single().execute()
+        return result.data
+
+    def get_by_user_and_oid(self, owner_user_id: str, microsoft_user_oid: str) -> Optional[Dict[str, Any]]:
+        """Return the connection for *(owner_user_id, microsoft_user_oid)*, or ``None``."""
+        result = (
+            self._client.table(self.TABLE)
+            .select("*")
+            .eq("owner_user_id", owner_user_id)
+            .eq("microsoft_user_oid", microsoft_user_oid)
+            .maybe_single()
+            .execute()
+        )
+        return result.data
+
+    def list_by_user(self, owner_user_id: str) -> List[Dict[str, Any]]:
+        """Return all Microsoft connection rows for *owner_user_id*."""
+        result = self._client.table(self.TABLE).select("*").eq("owner_user_id", owner_user_id).execute()
+        return result.data
+
+    def delete(self, connection_id: str) -> None:
+        """Delete the Microsoft connection row identified by *connection_id*."""
+        self._client.table(self.TABLE).delete().eq("id", connection_id).execute()
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +287,39 @@ class MeetingJobRepository:
             query = query.eq("status", status)
         return query.execute().data
 
+    def list_by_user(
+        self,
+        owner_user_id: str,
+        *,
+        status: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return meeting jobs for *owner_user_id*, optionally filtered by *status*.
+
+        Parameters
+        ----------
+        owner_user_id:
+            The Supabase auth user UUID whose jobs to list.
+        status:
+            Optional status filter.  Must be one of the values in
+            :data:`~services.db.models.MEETING_JOB_STATUSES`.
+        limit:
+            Maximum number of rows to return (default 100), ordered
+            newest-first by ``created_at``.
+        """
+        query = (
+            self._client.table(self.TABLE)
+            .select("*")
+            .eq("owner_user_id", owner_user_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+        )
+        if status is not None:
+            if status not in MEETING_JOB_STATUSES:
+                raise ValueError(f"Unknown status {status!r}. Must be one of: {sorted(MEETING_JOB_STATUSES)}")
+            query = query.eq("status", status)
+        return query.execute().data
+
 
 # ---------------------------------------------------------------------------
 # MeetingArtifactRepository
@@ -232,6 +348,11 @@ class MeetingArtifactRepository:
     def list_by_job(self, meeting_job_id: str) -> List[Dict[str, Any]]:
         """Return all artifact rows for a meeting job."""
         result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
+        return result.data
+
+    def list_by_user(self, owner_user_id: str) -> List[Dict[str, Any]]:
+        """Return all artifact rows owned by *owner_user_id*."""
+        result = self._client.table(self.TABLE).select("*").eq("owner_user_id", owner_user_id).execute()
         return result.data
 
 
@@ -281,6 +402,11 @@ class GeneratedNotesRepository:
         result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
         return result.data
 
+    def list_by_user(self, owner_user_id: str) -> List[Dict[str, Any]]:
+        """Return all generated-notes rows owned by *owner_user_id*."""
+        result = self._client.table(self.TABLE).select("*").eq("owner_user_id", owner_user_id).execute()
+        return result.data
+
 
 # ---------------------------------------------------------------------------
 # SharePointUploadRepository
@@ -309,6 +435,11 @@ class SharePointUploadRepository:
     def list_by_job(self, meeting_job_id: str) -> List[Dict[str, Any]]:
         """Return all upload rows for a meeting job."""
         result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
+        return result.data
+
+    def list_by_user(self, owner_user_id: str) -> List[Dict[str, Any]]:
+        """Return all SharePoint upload rows owned by *owner_user_id*."""
+        result = self._client.table(self.TABLE).select("*").eq("owner_user_id", owner_user_id).execute()
         return result.data
 
 
