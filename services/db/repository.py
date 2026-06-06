@@ -69,22 +69,12 @@ class TenantSettingsRepository:
         this method without knowing whether a row already exists.
         """
         payload = _strip_nones(asdict(settings))
-        result = (
-            self._client.table(self.TABLE)
-            .upsert(payload, on_conflict="tenant_id")
-            .execute()
-        )
+        result = self._client.table(self.TABLE).upsert(payload, on_conflict="tenant_id").execute()
         return result.data[0]
 
     def get_by_tenant(self, tenant_id: str) -> Optional[Dict[str, Any]]:
         """Return the settings row for *tenant_id*, or ``None`` if absent."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .maybe_single()
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("tenant_id", tenant_id).maybe_single().execute()
         return result.data
 
 
@@ -107,11 +97,7 @@ class UserIdentityRepository:
         Uses ``(tenant_id, user_oid)`` as the conflict target.
         """
         payload = _strip_nones(asdict(identity))
-        result = (
-            self._client.table(self.TABLE)
-            .upsert(payload, on_conflict="tenant_id,user_oid")
-            .execute()
-        )
+        result = self._client.table(self.TABLE).upsert(payload, on_conflict="tenant_id,user_oid").execute()
         return result.data[0]
 
     def get_by_oid(self, tenant_id: str, user_oid: str) -> Optional[Dict[str, Any]]:
@@ -128,12 +114,7 @@ class UserIdentityRepository:
 
     def list_by_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
         """Return all identity rows for a tenant."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("tenant_id", tenant_id).execute()
         return result.data
 
 
@@ -160,28 +141,16 @@ class MeetingJobRepository:
             value.
         """
         if job.source_type not in MEETING_SOURCE_TYPES:
-            raise ValueError(
-                f"Unknown source_type {job.source_type!r}. "
-                f"Must be one of: {sorted(MEETING_SOURCE_TYPES)}"
-            )
+            raise ValueError(f"Unknown source_type {job.source_type!r}. " f"Must be one of: {sorted(MEETING_SOURCE_TYPES)}")
         if job.status not in MEETING_JOB_STATUSES:
-            raise ValueError(
-                f"Unknown status {job.status!r}. "
-                f"Must be one of: {sorted(MEETING_JOB_STATUSES)}"
-            )
+            raise ValueError(f"Unknown status {job.status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
         payload = _strip_nones(asdict(job))
         result = self._client.table(self.TABLE).insert(payload).execute()
         return result.data[0]
 
     def get(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Return the job row for *job_id*, or ``None`` if not found."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("id", job_id)
-            .maybe_single()
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("id", job_id).maybe_single().execute()
         return result.data
 
     def update_status(
@@ -203,10 +172,7 @@ class MeetingJobRepository:
             If *status* is not a recognised value.
         """
         if status not in MEETING_JOB_STATUSES:
-            raise ValueError(
-                f"Unknown status {status!r}. "
-                f"Must be one of: {sorted(MEETING_JOB_STATUSES)}"
-            )
+            raise ValueError(f"Unknown status {status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
         patch: Dict[str, Any] = {"status": status}
         if error_message is not None:
             patch["error_message"] = error_message
@@ -218,12 +184,7 @@ class MeetingJobRepository:
             patch["input_tokens"] = input_tokens
         if output_tokens is not None:
             patch["output_tokens"] = output_tokens
-        result = (
-            self._client.table(self.TABLE)
-            .update(patch)
-            .eq("id", job_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).update(patch).eq("id", job_id).execute()
         return result.data[0]
 
     def list_by_tenant(
@@ -235,18 +196,11 @@ class MeetingJobRepository:
     ) -> List[Dict[str, Any]]:
         """Return meeting jobs for *tenant_id*, optionally filtered by *status*."""
         query = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .order("created_at", desc=True)
-            .limit(limit)
+            self._client.table(self.TABLE).select("*").eq("tenant_id", tenant_id).order("created_at", desc=True).limit(limit)
         )
         if status is not None:
             if status not in MEETING_JOB_STATUSES:
-                raise ValueError(
-                    f"Unknown status {status!r}. "
-                    f"Must be one of: {sorted(MEETING_JOB_STATUSES)}"
-                )
+                raise ValueError(f"Unknown status {status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
             query = query.eq("status", status)
         return query.execute().data
 
@@ -272,23 +226,12 @@ class MeetingArtifactRepository:
 
     def get(self, artifact_id: str) -> Optional[Dict[str, Any]]:
         """Return the artifact row for *artifact_id*, or ``None``."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("id", artifact_id)
-            .maybe_single()
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("id", artifact_id).maybe_single().execute()
         return result.data
 
     def list_by_job(self, meeting_job_id: str) -> List[Dict[str, Any]]:
         """Return all artifact rows for a meeting job."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("meeting_job_id", meeting_job_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
         return result.data
 
 
@@ -325,33 +268,17 @@ class GeneratedNotesRepository:
             patch["prompt_tokens"] = prompt_tokens
         if completion_tokens is not None:
             patch["completion_tokens"] = completion_tokens
-        result = (
-            self._client.table(self.TABLE)
-            .update(patch)
-            .eq("id", notes_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).update(patch).eq("id", notes_id).execute()
         return result.data[0]
 
     def get(self, notes_id: str) -> Optional[Dict[str, Any]]:
         """Return the notes row for *notes_id*, or ``None``."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("id", notes_id)
-            .maybe_single()
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("id", notes_id).maybe_single().execute()
         return result.data
 
     def list_by_job(self, meeting_job_id: str) -> List[Dict[str, Any]]:
         """Return all notes rows for a meeting job."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("meeting_job_id", meeting_job_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
         return result.data
 
 
@@ -376,23 +303,12 @@ class SharePointUploadRepository:
 
     def get(self, upload_id: str) -> Optional[Dict[str, Any]]:
         """Return the upload row for *upload_id*, or ``None``."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("id", upload_id)
-            .maybe_single()
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("id", upload_id).maybe_single().execute()
         return result.data
 
     def list_by_job(self, meeting_job_id: str) -> List[Dict[str, Any]]:
         """Return all upload rows for a meeting job."""
-        result = (
-            self._client.table(self.TABLE)
-            .select("*")
-            .eq("meeting_job_id", meeting_job_id)
-            .execute()
-        )
+        result = self._client.table(self.TABLE).select("*").eq("meeting_job_id", meeting_job_id).execute()
         return result.data
 
 
