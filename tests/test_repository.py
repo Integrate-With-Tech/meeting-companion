@@ -633,9 +633,7 @@ class TestMicrosoftConnectionRepository(unittest.TestCase):
         row = self._make_connection()
         client, chain = _mock_client(row)
         repo = MicrosoftConnectionRepository(client)
-        result = repo.upsert(
-            MicrosoftConnection(owner_user_id="user-uuid-1", microsoft_user_oid="ms-oid-1")
-        )
+        result = repo.upsert(MicrosoftConnection(owner_user_id="user-uuid-1", microsoft_user_oid="ms-oid-1"))
         self.assertEqual(result["owner_user_id"], "user-uuid-1")
         chain.upsert.assert_called_once()
 

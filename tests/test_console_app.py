@@ -7,6 +7,7 @@ import subprocess
 import sys
 import os
 from pathlib import Path
+import tempfile
 
 
 class TestConsoleApplication(unittest.TestCase):
@@ -72,6 +73,60 @@ class TestConsoleApplication(unittest.TestCase):
         """Test file command help"""
         result = self.run_script(["file", "--help"], expect_success=False)
         self.assertIn("Single File", result.stdout)
+
+    def test_notes_help(self):
+        """Test notes command help"""
+        result = self.run_script(["notes", "--help"], expect_success=False)
+        self.assertIn("Notes Mode", result.stdout)
+
+    def test_notes_command_with_plain_text_transcript(self):
+        """Test notes command using a plain text transcript without ML dependencies."""
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "meeting.txt"
+            output_dir = Path(tmp) / "out"
+            transcript.write_text(
+                "Agenda: roadmap review. Action item: Sam will send notes. Decision: keep the release date.",
+                encoding="utf-8",
+            )
+            result = self.run_script(
+                [
+                    "notes",
+                    "--transcript",
+                    str(transcript),
+                    "--output",
+                    str(output_dir),
+                    "--summarizer",
+                    "none",
+                ]
+            )
+            self.assertIn("Notes generated successfully", result.stdout)
+            self.assertTrue(any(path.suffix == ".md" for path in output_dir.iterdir()))
+            self.assertTrue(any(path.suffix == ".json" for path in output_dir.iterdir()))
+
+    def test_notes_command_with_vtt_transcript(self):
+        """Test notes command using a Teams VTT transcript without ML dependencies."""
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "meeting.vtt"
+            output_dir = Path(tmp) / "out"
+            transcript.write_text(
+                "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\n<v Alex>Agenda: kickoff\n\n"
+                "00:00:03.000 --> 00:00:05.000\nDecision: move ahead\n",
+                encoding="utf-8",
+            )
+            result = self.run_script(
+                [
+                    "notes",
+                    "--transcript",
+                    str(transcript),
+                    "--output",
+                    str(output_dir),
+                    "--summarizer",
+                    "none",
+                ]
+            )
+            self.assertIn("Source:", result.stdout)
+            self.assertTrue(any(path.suffix == ".md" for path in output_dir.iterdir()))
+            self.assertTrue(any(path.suffix == ".json" for path in output_dir.iterdir()))
 
     def test_invalid_command(self):
         """Test handling of invalid commands"""

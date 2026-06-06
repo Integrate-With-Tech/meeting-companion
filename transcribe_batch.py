@@ -103,6 +103,7 @@ from services.artifacts import (
     ensure_dirs,
     write_artifacts,
 )
+from services.meeting_notes import write_notes_exports
 
 # --------------------------- worker ---------------------------
 
@@ -411,6 +412,47 @@ def process_single_file(args):
 
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}⚠️  Processing interrupted by user{Colors.END}")
+    except Exception as e:
+        print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")
+
+
+def process_notes_file(args):
+    """Generate meeting notes from a transcript file."""
+    print_banner()
+
+    transcript_path = Path(args.transcript)
+    if not transcript_path.exists():
+        print(f"{Colors.RED}❌ Transcript file not found: {transcript_path}{Colors.END}")
+        return
+
+    output_dir = Path(args.output)
+    title = args.title.strip() if args.title else transcript_path.stem.replace("_", " ").replace("-", " ").title()
+
+    print(f"\n{Colors.BLUE}📋 Notes Generation{Colors.END}")
+    print(f"📄 Transcript:  {Colors.BOLD}{transcript_path.name}{Colors.END}")
+    print(f"📂 Output dir:  {Colors.BOLD}{output_dir.resolve()}{Colors.END}")
+    print(f"📝 Title:       {Colors.BOLD}{title}{Colors.END}")
+    print(f"🧠 Summary:     {Colors.BOLD}{args.summarizer}{Colors.END}")
+
+    try:
+        result = write_notes_exports(
+            transcript_path=transcript_path,
+            output_dir=output_dir,
+            meeting_title=title,
+            summarizer=args.summarizer,
+            summary_max=args.summary_max,
+        )
+        payload = result["payload"]
+        print(f"\n{Colors.GREEN}✅ Notes generated successfully{Colors.END}")
+        print(f"🗂️  Source:      {Colors.BOLD}{payload.source_type}{Colors.END}")
+        print(f"📌 Agenda:      {Colors.BOLD}{len(payload.structured_notes['agenda'])}{Colors.END} items")
+        print(f"✅ Actions:     {Colors.BOLD}{len(payload.structured_notes['action_items'])}{Colors.END} items")
+        print(f"🧾 Decisions:   {Colors.BOLD}{len(payload.structured_notes['decisions'])}{Colors.END} items")
+        print(f"\n{Colors.BLUE}📋 Generated files:{Colors.END}")
+        for path in result["files"]:
+            print(f"  ✅ {path.name} ({path.stat().st_size:,} bytes)")
+    except ValueError as e:
+        print(f"\n{Colors.RED}❌ {e}{Colors.END}")
     except Exception as e:
         print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")
 
@@ -871,6 +913,7 @@ def show_examples():
         ("📄 Single File", "meeting-companion file --input myvideo.mp4"),
         ("📂 Browse for File", "meeting-companion file --browse"),
         ("🗣️  Spanish Language", "meeting-companion run --language es --input videos/ --output results/"),
+        ("📝 Generate Notes From Transcript", "meeting-companion notes --transcript meeting.vtt --output notes/"),
         ("🚫 Skip AI Summary", "meeting-companion run --no-summary --input videos/ --output results/"),
         ("⚙️  Check Dependencies", "meeting-companion --check-deps"),
     ]
@@ -919,6 +962,7 @@ def show_comprehensive_help():
     print("• captions.vtt - WebVTT caption file")
     print("• full.txt - Plain text transcript")
     print("• summary.md - AI-generated summary (if enabled)")
+    print("• notes markdown/json - Generated via `meeting-companion notes`")
 
     print(f"\n{Colors.GREEN}For more help: {Colors.CYAN}meeting-companion <command> --help{Colors.END}")
     print(f"{Colors.GREEN}Report issues: {Colors.CYAN}https://github.com/sejalsheth/integrate-with-tech/issues{Colors.END}")
@@ -973,6 +1017,11 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
         help="Process a single video file",
         description=f"{Colors.BOLD}Single File Mode{Colors.END}\n\nTranscribe one specific video file.",
     )
+    notes_cmd = sub.add_parser(
+        "notes",
+        help="Generate notes from a transcript file",
+        description=f"{Colors.BOLD}Notes Mode{Colors.END}\n\nGenerate Markdown and JSON meeting notes from a transcript.",
+    )
 
     # Input/Output for batch mode
     io_group = run_cmd.add_argument_group("📁 Input/Output")
@@ -985,6 +1034,11 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
     file_io_group.add_argument("--input", "-i", required=True, help="Video file to transcribe")
     file_io_group.add_argument("--output", "-o", help="Output directory (default: same as input file)")
     file_io_group.add_argument("--browse", action="store_true", help="Browse and select input file interactively")
+
+    notes_io_group = notes_cmd.add_argument_group("📁 Input/Output")
+    notes_io_group.add_argument("--transcript", "-t", required=True, help="Transcript file (.vtt or plain text)")
+    notes_io_group.add_argument("--output", "-o", required=True, help="Directory to save generated notes")
+    notes_io_group.add_argument("--title", help="Optional meeting title override")
 
     # Quick presets
     preset_group = run_cmd.add_argument_group("🚀 Quick Presets")
@@ -1050,6 +1104,12 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
     )
     file_ai_group.add_argument("--summary-max", type=int, default=8, help="Maximum sentences in AI summary")
     file_ai_group.add_argument("--no-summary", action="store_true", help="Skip AI summary generation")
+
+    notes_ai_group = notes_cmd.add_argument_group("🧠 AI Features")
+    notes_ai_group.add_argument(
+        "--summarizer", choices=["bart", "none"], default="bart", help="AI summarization method (default: bart)"
+    )
+    notes_ai_group.add_argument("--summary-max", type=int, default=8, help="Maximum sentences in AI summary")
 
     # Copy presets to single file mode
     file_preset_group = file_cmd.add_argument_group("🚀 Quick Presets")
@@ -1232,6 +1292,20 @@ def main():
             process_single_file(args)
         except KeyboardInterrupt:
             print(f"\n\n{Colors.YELLOW}⚠️  Processing interrupted by user{Colors.END}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")
+            sys.exit(1)
+
+    elif args.mode == "notes":
+        if args.summarizer == "bart" and not validate_dependencies():
+            print(f"\n{Colors.RED}❌ Missing dependencies. Run with --check-deps for details.{Colors.END}")
+            sys.exit(1)
+
+        try:
+            process_notes_file(args)
+        except KeyboardInterrupt:
+            print(f"\n\n{Colors.YELLOW}⚠️  Notes generation interrupted by user{Colors.END}")
             sys.exit(1)
         except Exception as e:
             print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")

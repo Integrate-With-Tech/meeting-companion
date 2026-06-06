@@ -98,11 +98,7 @@ class MicrosoftConnectionRepository:
         Uses ``(owner_user_id, microsoft_user_oid)`` as the conflict target.
         """
         payload = _strip_nones(asdict(connection))
-        result = (
-            self._client.table(self.TABLE)
-            .upsert(payload, on_conflict="owner_user_id,microsoft_user_oid")
-            .execute()
-        )
+        result = self._client.table(self.TABLE).upsert(payload, on_conflict="owner_user_id,microsoft_user_oid").execute()
         return result.data[0]
 
     def get(self, connection_id: str) -> Optional[Dict[str, Any]]:
