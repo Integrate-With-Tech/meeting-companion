@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Meeting Detail</title>
+</head>
+<body>
+  <h1>{{ detail.meeting_title }}</h1>
+  <p>Transcript Source: {{ detail.transcript_source }}</p>
+  <p>Processing Status: {{ detail.status }}</p>
+  <p>Upload Status: {{ detail.upload_status }}</p>
+  <p>Model Metadata: {{ detail.model_name }} {{ detail.model_version }}</p>
+  <p>Audit Status: {{ detail.audit_status }}</p>
+
+  <h2>Agenda</h2>
+  <ul>{% for item in detail.agenda %}<li>{{ item }}</li>{% endfor %}</ul>
+
+  <h2>Action Items</h2>
+  <ul>{% for item in detail.action_items %}<li>{{ item }}</li>{% endfor %}</ul>
+
+  <h2>Decisions</h2>
+  <ul>{% for item in detail.decisions %}<li>{{ item }}</li>{% endfor %}</ul>
+
+  <h2>SharePoint Links</h2>
+  <ul>
+    {% for link in detail.sharepoint_links %}
+    <li><a href="{{ link }}">{{ link }}</a></li>
+    {% endfor %}
+  </ul>
+
+  <h2>Downloads</h2>
+  <ul>
+    <li><a href="/notes/meetings/{{ detail.meeting_job_id }}/download/markdown?tenant_id={{ tenant_id }}&viewer_id={{ viewer_id }}&is_admin={{ is_admin }}">Download Markdown</a></li>
+    <li><a href="/notes/meetings/{{ detail.meeting_job_id }}/download/json?tenant_id={{ tenant_id }}&viewer_id={{ viewer_id }}&is_admin={{ is_admin }}">Download JSON</a></li>
+  </ul>
+
+  <p><a href="/notes/history?tenant_id={{ tenant_id }}&viewer_id={{ viewer_id }}&is_admin={{ is_admin }}">Back to history</a></p>
+</body>
+</html>

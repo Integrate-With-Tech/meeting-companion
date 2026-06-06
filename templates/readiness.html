@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Readiness Checklist</title>
+</head>
+<body>
+  <h1>Readiness Checklist</h1>
+  <ul>
+    {% for check in checks %}
+    <li>{{ check.label }}: {% if check.ready %}Ready{% else %}Not Ready{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <p><a href="/admin/setup?tenant_id={{ tenant_id }}">Back to setup</a></p>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Notes History</title>
+</head>
+<body>
+  <h1>Notes History</h1>
+  <form method="get" action="/notes/history">
+    <input type="hidden" name="tenant_id" value="{{ tenant_id }}" />
+    <input type="hidden" name="viewer_id" value="{{ viewer_id }}" />
+    <input type="hidden" name="is_admin" value="{{ is_admin }}" />
+    <label>Date <input name="date" value="{{ filters.date }}" /></label>
+    <label>Organizer <input name="organizer" value="{{ filters.organizer }}" /></label>
+    <label>Status <input name="status" value="{{ filters.status }}" /></label>
+    <label>Transcript Source <input name="transcript_source" value="{{ filters.transcript_source }}" /></label>
+    <label>Upload Status <input name="upload_status" value="{{ filters.upload_status }}" /></label>
+    <button type="submit">Apply Filters</button>
+  </form>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Meeting</th>
+        <th>Organizer</th>
+        <th>Status</th>
+        <th>Transcript Source</th>
+        <th>Upload Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in notes %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>
+          <a href="/notes/meetings/{{ row.meeting_job_id }}?tenant_id={{ tenant_id }}&viewer_id={{ viewer_id }}&is_admin={{ is_admin }}">
+            {{ row.meeting_title }}
+          </a>
+        </td>
+        <td>{{ row.organizer }}</td>
+        <td>{{ row.status }}</td>
+        <td>{{ row.transcript_source }}</td>
+        <td>{{ row.upload_status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
