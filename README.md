@@ -19,6 +19,8 @@ A robust batch transcription tool that processes MP4 videos using OpenAI's Whisp
 - **High-Quality Transcription**: Uses OpenAI's Whisper large-v3 model for accurate speech-to-text
 - **AI Summarization**: Generates concise summaries using Facebook's BART large CNN model
 - **Multiple Output Formats**: Produces transcripts, SRT subtitles, VTT captions, and markdown summaries
+- **Meeting Notes Export**: Generates downloadable `{meeting-date}-{meeting-title}-notes.md` and `.json` files
+- **SharePoint Upload Tracking**: Persists SharePoint upload status/metadata for auditable note delivery
 - **Robust Error Handling**: Built-in retry logic, timeout protection, and progress monitoring
 - **Resume Capability**: Automatically skips already processed files
 - **Real-time Feedback**: Clear terminal output showing processing progress
@@ -56,6 +58,13 @@ outputs/
 - Main discussion points include practical applications and examples
 - The video concludes with actionable takeaways for viewers
 ```
+
+### Meeting Notes Delivery Artifacts
+
+For app/worker integrations, generated meeting notes are exposed as:
+
+- `{meeting-date}-{meeting-title}-notes.md`
+- `{meeting-date}-{meeting-title}-notes.json`
 
 ## 🛠️ Installation
 

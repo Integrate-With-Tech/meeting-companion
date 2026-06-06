@@ -133,11 +133,14 @@ class SharePointUpload:
     """Row in the ``sharepoint_uploads`` table."""
 
     meeting_job_id: str
-    sharepoint_item_id: str
+    sharepoint_item_id: Optional[str] = None
     artifact_id: Optional[str] = None
     web_url: Optional[str] = None
     drive_id: Optional[str] = None
     site_id: Optional[str] = None
+    content_hash: Optional[str] = None
+    upload_status: str = "pending"
+    error_message: Optional[str] = None
     uploaded_at: Optional[str] = None
     id: Optional[str] = None
     created_at: Optional[str] = None
