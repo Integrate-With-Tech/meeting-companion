@@ -192,8 +192,19 @@ def ingest_teams_native_artifacts(
         return {"status": "completed", "source": "teams_native", "hash": digest, "segments": segments}
 
     skipped_recordings = 0
+    persisted_recordings = 0
     for artifact in recording_artifacts:
-        storage_path = str(artifact.get("download_url") or artifact.get("id") or "").strip()
+        # Prefer direct download URLs when available; fall back to stable Graph IDs.
+        download_url = artifact.get("download_url")
+        artifact_id = artifact.get("id")
+        storage_candidate = (
+            download_url
+            if isinstance(download_url, str)
+            else artifact_id
+            if isinstance(artifact_id, str)
+            else ""
+        )
+        storage_path = storage_candidate.strip()
         if not storage_path:
             skipped_recordings += 1
             continue
@@ -204,6 +215,7 @@ def ingest_teams_native_artifacts(
                 storage_path=storage_path,
             )
         )
+        persisted_recordings += 1
 
     if skipped_recordings:
         audit_repo.append(
@@ -216,7 +228,7 @@ def ingest_teams_native_artifacts(
             )
         )
 
-    if meeting_completed and not recording_artifacts:
+    if meeting_completed and not vtt_content and persisted_recordings == 0:
         jobs_repo.update_status(meeting_job_id, "missing_source_artifact")
         audit_repo.append(
             AuditEvent(

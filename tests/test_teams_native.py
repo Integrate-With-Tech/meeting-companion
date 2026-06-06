@@ -18,14 +18,18 @@ class TestParseVttSegments(unittest.TestCase):
 2
 00:00:03.500 --> 00:00:05.000
 Priya: Let us begin
+
+00:00:06.000 --> 00:00:07.000
+O'Brien: Thanks
 """
         segments = parse_vtt_segments(vtt)
-        self.assertEqual(len(segments), 2)
+        self.assertEqual(len(segments), 3)
         self.assertEqual(segments[0].speaker, "Alex")
         self.assertEqual(segments[0].text, "Welcome everyone")
         self.assertEqual(segments[0].start_seconds, 1.0)
         self.assertEqual(segments[1].speaker, "Priya")
         self.assertEqual(segments[1].end_seconds, 5.0)
+        self.assertEqual(segments[2].speaker, "O'Brien")
 
 
 class TestIngestTeamsNativeArtifacts(unittest.TestCase):
@@ -102,7 +106,7 @@ class TestIngestTeamsNativeArtifacts(unittest.TestCase):
     def test_records_skipped_recording_artifacts_without_paths(self):
         graph = MagicMock()
         graph.get_transcript_vtt.return_value = None
-        graph.list_recording_artifacts.return_value = [{"id": ""}, {"download_url": "https://example.com/a.mp4"}]
+        graph.list_recording_artifacts.return_value = [{"id": None}, {"download_url": "https://example.com/a.mp4"}]
         jobs, artifacts, audits = self._repos()
 
         result = ingest_teams_native_artifacts(
@@ -118,8 +122,29 @@ class TestIngestTeamsNativeArtifacts(unittest.TestCase):
 
         self.assertEqual(result["status"], "completed")
         self.assertEqual(artifacts.create.call_count, 1)
+        self.assertEqual(artifacts.create.call_args[0][0].storage_path, "https://example.com/a.mp4")
         event_types = [call.args[0].event_type for call in audits.append.call_args_list]
         self.assertIn("meeting_job.recording_artifact_skipped", event_types)
+
+    def test_marks_missing_when_all_recording_artifacts_are_unusable(self):
+        graph = MagicMock()
+        graph.get_transcript_vtt.return_value = None
+        graph.list_recording_artifacts.return_value = [{"id": None, "download_url": None}, {}]
+        jobs, artifacts, audits = self._repos()
+
+        result = ingest_teams_native_artifacts(
+            meeting_id="m1",
+            meeting_job_id="j1",
+            tenant_id="t1",
+            meeting_completed=True,
+            graph_client=graph,
+            jobs_repo=jobs,
+            artifacts_repo=artifacts,
+            audit_repo=audits,
+        )
+
+        self.assertEqual(result["status"], "missing_source_artifact")
+        artifacts.create.assert_not_called()
 
 
 if __name__ == "__main__":
