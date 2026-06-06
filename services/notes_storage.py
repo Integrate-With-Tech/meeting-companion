@@ -203,7 +203,13 @@ def persist_generated_notes(
         structured_notes=structured_notes,
     )
 
-    notes_row = generated_notes_repo.create(GeneratedNotes(meeting_job_id=meeting_job_id, content=markdown_notes))
+    notes_row = generated_notes_repo.create(
+        GeneratedNotes(
+            meeting_job_id=meeting_job_id,
+            content=markdown_notes,
+            owner_user_id=owner_user_id,
+        )
+    )
     if audit_repo is not None:
         audit_repo.append(
             AuditEvent(
@@ -228,6 +234,7 @@ def persist_generated_notes(
                 storage_path=export_file.filename,
                 checksum=export_file.content_hash,
                 size_bytes=len(export_file.text_content.encode("utf-8")),
+                owner_user_id=owner_user_id,
             )
         )
         artifact_rows.append(artifact_row)
@@ -257,6 +264,7 @@ def persist_generated_notes(
                         content_hash=upload_result.content_hash or export_file.content_hash,
                         upload_status="uploaded",
                         uploaded_at=upload_result.uploaded_at or _utc_now_iso(),
+                        owner_user_id=owner_user_id,
                     )
                 )
                 if audit_repo is not None:
@@ -286,6 +294,7 @@ def persist_generated_notes(
                         upload_status="failed",
                         error_message=str(exc),
                         uploaded_at=_utc_now_iso(),
+                        owner_user_id=owner_user_id,
                     )
                 )
                 if audit_repo is not None:
