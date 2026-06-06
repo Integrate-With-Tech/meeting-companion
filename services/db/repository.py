@@ -141,9 +141,9 @@ class MeetingJobRepository:
             value.
         """
         if job.source_type not in MEETING_SOURCE_TYPES:
-            raise ValueError(f"Unknown source_type {job.source_type!r}. " f"Must be one of: {sorted(MEETING_SOURCE_TYPES)}")
+            raise ValueError(f"Unknown source_type {job.source_type!r}. Must be one of: {sorted(MEETING_SOURCE_TYPES)}")
         if job.status not in MEETING_JOB_STATUSES:
-            raise ValueError(f"Unknown status {job.status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
+            raise ValueError(f"Unknown status {job.status!r}. Must be one of: {sorted(MEETING_JOB_STATUSES)}")
         payload = _strip_nones(asdict(job))
         result = self._client.table(self.TABLE).insert(payload).execute()
         return result.data[0]
@@ -172,7 +172,7 @@ class MeetingJobRepository:
             If *status* is not a recognised value.
         """
         if status not in MEETING_JOB_STATUSES:
-            raise ValueError(f"Unknown status {status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
+            raise ValueError(f"Unknown status {status!r}. Must be one of: {sorted(MEETING_JOB_STATUSES)}")
         patch: Dict[str, Any] = {"status": status}
         if error_message is not None:
             patch["error_message"] = error_message
@@ -200,7 +200,7 @@ class MeetingJobRepository:
         )
         if status is not None:
             if status not in MEETING_JOB_STATUSES:
-                raise ValueError(f"Unknown status {status!r}. " f"Must be one of: {sorted(MEETING_JOB_STATUSES)}")
+                raise ValueError(f"Unknown status {status!r}. Must be one of: {sorted(MEETING_JOB_STATUSES)}")
             query = query.eq("status", status)
         return query.execute().data
 
