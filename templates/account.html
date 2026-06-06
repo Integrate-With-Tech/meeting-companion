@@ -36,7 +36,7 @@
   <p>Status: <strong>Connected</strong></p>
   {% for conn in microsoft_connections %}
   <div>
-    <p>Account: {{ conn.display_name }} ({{ conn.email }})</p>
+    <p>Account: <strong>{{ conn.display_name }}</strong> ({{ conn.email }})</p>
     {% if conn.tenant_id %}<p>Tenant: {{ conn.tenant_id }}</p>{% endif %}
     <form method="post" action="/auth/microsoft/disconnect">
       <input type="hidden" name="user_id" value="{{ user_id }}" />

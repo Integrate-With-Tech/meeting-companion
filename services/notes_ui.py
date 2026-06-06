@@ -489,7 +489,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         return Response(content=export["content"], media_type=export["content_type"], headers=headers)
 
     @app.get("/auth/sign-in", response_class=HTMLResponse)
-    def sign_in(request: Request, magic_link_sent: bool = Query(False)) -> HTMLResponse:
+    def sign_in_page(request: Request, magic_link_sent: bool = Query(False)) -> HTMLResponse:
         return templates.TemplateResponse(
             request=request,
             name="sign_in.html",
@@ -505,7 +505,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         )
 
     @app.get("/auth/account", response_class=HTMLResponse)
-    def account(request: Request, user_id: str = Query("")) -> HTMLResponse:
+    def account_page(request: Request, user_id: str = Query("")) -> HTMLResponse:
         profile = _service().get_user_profile(user_id)
         connections = _service().list_microsoft_connections(user_id)
         return templates.TemplateResponse(
@@ -520,7 +520,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         )
 
     @app.post("/auth/microsoft/disconnect", response_class=HTMLResponse)
-    def disconnect_microsoft(
+    def disconnect_microsoft_post(
         request: Request,
         user_id: str = Form(...),
         connection_id: str = Form(...),
