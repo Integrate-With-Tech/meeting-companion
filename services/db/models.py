@@ -54,7 +54,16 @@ class UserIdentity:
 
 MEETING_SOURCE_TYPES = frozenset({"teams_native", "uploaded_media", "uploaded_transcript", "bot_capture"})
 
-MEETING_JOB_STATUSES = frozenset({"pending", "processing", "completed", "failed", "missing_source_artifact"})
+MEETING_JOB_STATUSES = frozenset(
+    {
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "missing_source_artifact",
+        "authorization_failed",
+    }
+)
 
 
 @dataclass
