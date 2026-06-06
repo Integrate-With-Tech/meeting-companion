@@ -26,6 +26,8 @@ from services.db.repository import (
     UserProfileRepository,
 )
 
+SUPPORTED_SOCIAL_PROVIDERS = frozenset({"google", "github"})
+
 
 def _slugify(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9]+", "-", value.strip()).strip("-").lower()
@@ -628,8 +630,9 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         display_name: str = Query(""),
     ) -> HTMLResponse:
         normalized_provider = provider.lower().strip()
-        if normalized_provider not in {"google", "github"}:
-            raise HTTPException(status_code=400, detail="Unsupported social provider")
+        if normalized_provider not in SUPPORTED_SOCIAL_PROVIDERS:
+            supported = ", ".join(sorted(SUPPORTED_SOCIAL_PROVIDERS))
+            raise HTTPException(status_code=400, detail=f"Unsupported social provider. Supported providers: {supported}")
         if user_id:
             _service().upsert_user_profile(user_id, email=email, display_name=display_name)
         _service()._append_audit(
@@ -683,7 +686,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         )
 
     @app.get("/auth/microsoft/connect", response_class=HTMLResponse)
-    def connect_microsoft_get(
+    def connect_microsoft(
         request: Request,
         user_id: str = Query(""),
         microsoft_user_oid: str = Query(""),
@@ -693,11 +696,10 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         access_token_ref: str = Query(""),
         refresh_token_ref: str = Query(""),
     ) -> HTMLResponse:
-        if user_id:
-            oid = microsoft_user_oid or f"oid-{user_id}"
+        if user_id and microsoft_user_oid:
             _service().connect_microsoft(
                 user_id,
-                microsoft_user_oid=oid,
+                microsoft_user_oid=microsoft_user_oid,
                 email=email,
                 display_name=display_name,
                 tenant_id=tenant_id,
