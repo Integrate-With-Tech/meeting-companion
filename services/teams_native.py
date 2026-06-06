@@ -130,6 +130,7 @@ def ingest_teams_native_artifacts(
     jobs_repo: Any,
     artifacts_repo: Any,
     audit_repo: Any,
+    bot_capture_enabled: bool = False,
 ) -> Dict[str, Any]:
     """Ingest Teams-native transcript/recording metadata for one meeting job."""
     jobs_repo.update_status(meeting_job_id, "processing")
@@ -234,6 +235,25 @@ def ingest_teams_native_artifacts(
             )
         )
         return {"status": "missing_source_artifact", "source": "teams_native", "segments": []}
+
+    if not meeting_completed and not vtt_content and persisted_recordings == 0:
+        status = "scheduled_bot_capture" if bot_capture_enabled else "capture_unavailable"
+        jobs_repo.update_status(meeting_job_id, status)
+        audit_repo.append(
+            AuditEvent(
+                event_type=f"meeting_job.{status}",
+                tenant_id=tenant_id,
+                resource_type="meeting_job",
+                resource_id=meeting_job_id,
+                metadata={
+                    "source": "bot_capture" if bot_capture_enabled else "teams_native",
+                    "meeting_id": meeting_id,
+                    "future_meeting_only": True,
+                    "whisper_transcription_path": "uploaded_or_captured_media",
+                },
+            )
+        )
+        return {"status": status, "source": "bot_capture", "segments": []}
 
     jobs_repo.update_status(meeting_job_id, "completed")
     audit_repo.append(

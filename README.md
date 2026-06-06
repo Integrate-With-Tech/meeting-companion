@@ -88,6 +88,8 @@ Then open:
 - `http://127.0.0.1:8000/admin/readiness`
 - `http://127.0.0.1:8000/notes/history`
 
+Future visible bot/media capture fallback requirements are documented in [docs/future-bot-capture-fallback.md](docs/future-bot-capture-fallback.md).
+
 ## 🛠️ Installation
 
 ### Quick Installation

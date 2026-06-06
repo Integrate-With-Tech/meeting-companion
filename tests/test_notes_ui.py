@@ -36,6 +36,15 @@ class _FakeUIService:
                 "transcript_source": "uploaded_transcript",
                 "upload_status": "failed",
             },
+            {
+                "meeting_job_id": "job-3",
+                "meeting_title": "Planning Session",
+                "date": "2026-06-03",
+                "organizer": "organizer-c",
+                "status": "scheduled_bot_capture",
+                "transcript_source": "bot_capture",
+                "upload_status": "pending",
+            },
         ]
         self._profiles = {
             "user-1": {"id": "user-1", "email": "alice@example.com", "display_name": "Alice"},
@@ -92,6 +101,26 @@ class _FakeUIService:
         return rows
 
     def get_note_detail(self, *, tenant_id, meeting_job_id, viewer_id, is_admin):
+        if meeting_job_id == "job-3":
+            return {
+                "meeting_job_id": "job-3",
+                "meeting_title": "Planning Session",
+                "meeting_date": "2026-06-03",
+                "agenda": [],
+                "action_items": [],
+                "decisions": [],
+                "sharepoint_links": [],
+                "transcript_source": "bot_capture",
+                "status": "scheduled_bot_capture",
+                "model_name": "",
+                "model_version": "",
+                "prompt_tokens": None,
+                "completion_tokens": None,
+                "audit_status": "events_recorded",
+                "artifacts": [],
+                "content": "# Planning Session\n\n## Agenda\n- None identified.\n",
+                "upload_status": "pending",
+            }
         if meeting_job_id != "job-1":
             return None
         return {
@@ -218,6 +247,7 @@ class TestNotesUIRoutes(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertIn("Weekly Sync", history.text)
         self.assertNotIn("Ops Review", history.text)
+        self.assertIn("Teams native transcript", history.text)
 
         detail = self.client.get("/notes/meetings/job-1?tenant_id=t-1")
         self.assertEqual(detail.status_code, 200)
@@ -233,6 +263,12 @@ class TestNotesUIRoutes(unittest.TestCase):
         json_download = self.client.get("/notes/meetings/job-1/download/json?tenant_id=t-1")
         self.assertEqual(json_download.status_code, 200)
         self.assertIn("application/json", json_download.headers["content-type"])
+
+    def test_detail_shows_scheduled_bot_capture_message(self):
+        response = self.client.get("/notes/meetings/job-3?tenant_id=t-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Visible bot capture scheduled", response.text)
+        self.assertIn("Whisper pipeline", response.text)
 
 
 class TestAuthRoutes(unittest.TestCase):
