@@ -111,8 +111,8 @@ class TestTranscribeBatch(unittest.TestCase):
         """Test configuration path generation"""
         config_path = get_config_path()
         self.assertIsInstance(config_path, Path)
-        # Should contain 'video-transcribe' in the path
-        self.assertIn("video-transcribe", str(config_path))
+        # Should contain 'meeting-companion' in the path
+        self.assertIn("meeting-companion", str(config_path))
 
 
 class TestBasicFunctionality(unittest.TestCase):

@@ -1,29 +1,29 @@
 """
-🎥 Video Transcription Console Tool
+🎥 Meeting Companion Console Tool
 Batch transcribe MP4 files with OpenAI Whisper + Facebook BART AI Summary
 
 ✨ Features:
 - 🚀 High-quality transcription using Whisper large-v3 model
 - 🤖 AI-powered summarization with Facebook BART
-- 📁 Batch processing with smart resume capability  
+- 📁 Batch processing with smart resume capability
 - 🔄 Robust error handling and automatic retries
 - 📊 Real-time progress tracking and feedback
 - 🎯 Multiple output formats (SRT, VTT, TXT, MD)
 
-🛠️  Quick Setup:
+🛠️ Quick Setup:
   brew install ffmpeg                    # Install FFmpeg
   pip install faster-whisper transformers torch sentencepiece
 
 🚀 Usage Examples:
-  video-transcribe --help               # Show detailed help
-  video-transcribe --interactive        # Interactive setup wizard
-  video-transcribe run --quick          # Quick start with defaults
-  
+  meeting-companion --help               # Show detailed help
+  meeting-companion --interactive        # Interactive setup wizard
+  meeting-companion run --quick          # Quick start with defaults
+
   # Advanced batch processing:
-  video-transcribe run \\
-    --input input_mp4 \\
-    --output outputs \\
-    --model large-v3 \\
+  meeting-companion run \
+    --input input_mp4 \
+    --output outputs \
+    --model large-v3 \
     --language en
 """
 
@@ -76,7 +76,7 @@ def print_banner():
     banner = f"""
 {Colors.CYAN}{Colors.BOLD}
 ╔════════════════════════════════════════════════════════════════╗
-║                   🎥 Video Transcription Tool                  ║
+║                   🎥 Meeting Companion                         ║
 ║                 AI-Powered Speech-to-Text + Summary            ║
 ╚════════════════════════════════════════════════════════════════╝
 {Colors.END}
@@ -426,7 +426,7 @@ def get_config_path() -> Path:
     else:
         config_dir = os.getenv("APPDATA", os.path.expanduser("~"))
 
-    config_path = Path(config_dir) / "video-transcribe" / "config.json"
+    config_path = Path(config_dir) / "meeting-companion" / "config.json"
     return config_path
 
 
@@ -863,16 +863,16 @@ def show_examples():
     print("─" * 60)
 
     examples = [
-        ("🚀 Quick Start (Interactive)", "video-transcribe --interactive"),
-        ("📁 Batch Process Directory", "video-transcribe run --input videos/ --output results/"),
-        ("🎯 High Quality Mode", "video-transcribe run --quality --input videos/ --output results/"),
-        ("⚡ Fast Testing Mode", "video-transcribe run --fast --input videos/ --output results/"),
-        ("🔍 Select Files Manually", "video-transcribe run --select --input videos/ --output results/"),
-        ("📄 Single File", "video-transcribe file --input myvideo.mp4"),
-        ("📂 Browse for File", "video-transcribe file --browse"),
-        ("🗣️  Spanish Language", "video-transcribe run --language es --input videos/ --output results/"),
-        ("🚫 Skip AI Summary", "video-transcribe run --no-summary --input videos/ --output results/"),
-        ("⚙️  Check Dependencies", "video-transcribe --check-deps"),
+        ("🚀 Quick Start (Interactive)", "meeting-companion --interactive"),
+        ("📁 Batch Process Directory", "meeting-companion run --input videos/ --output results/"),
+        ("🎯 High Quality Mode", "meeting-companion run --quality --input videos/ --output results/"),
+        ("⚡ Fast Testing Mode", "meeting-companion run --fast --input videos/ --output results/"),
+        ("🔍 Select Files Manually", "meeting-companion run --select --input videos/ --output results/"),
+        ("📄 Single File", "meeting-companion file --input myvideo.mp4"),
+        ("📂 Browse for File", "meeting-companion file --browse"),
+        ("🗣️  Spanish Language", "meeting-companion run --language es --input videos/ --output results/"),
+        ("🚫 Skip AI Summary", "meeting-companion run --no-summary --input videos/ --output results/"),
+        ("⚙️  Check Dependencies", "meeting-companion --check-deps"),
     ]
 
     for description, command in examples:
@@ -884,7 +884,7 @@ def show_comprehensive_help():
     """Show detailed help information"""
     print_banner()
 
-    print(f"\n{Colors.BOLD}🎥 Video Transcription Console Tool - Complete Guide{Colors.END}")
+    print(f"\n{Colors.BOLD}🎥 Meeting Companion Console Tool - Complete Guide{Colors.END}")
     print("=" * 70)
 
     show_model_info()
@@ -908,8 +908,8 @@ def show_comprehensive_help():
     print(f"\n{Colors.BOLD}🔧 Configuration{Colors.END}")
     print("─" * 60)
     print("Configuration is automatically saved in:")
-    print(f"• macOS/Linux: ~/.config/video-transcribe/config.json")
-    print(f"• Windows: %APPDATA%/video-transcribe/config.json")
+    print(f"• macOS/Linux: ~/.config/meeting-companion/config.json")
+    print(f"• Windows: %APPDATA%/meeting-companion/config.json")
 
     print(f"\n{Colors.BOLD}📁 Output Files{Colors.END}")
     print("─" * 60)
@@ -920,7 +920,7 @@ def show_comprehensive_help():
     print("• full.txt - Plain text transcript")
     print("• summary.md - AI-generated summary (if enabled)")
 
-    print(f"\n{Colors.GREEN}For more help: {Colors.CYAN}video-transcribe <command> --help{Colors.END}")
+    print(f"\n{Colors.GREEN}For more help: {Colors.CYAN}meeting-companion <command> --help{Colors.END}")
     print(f"{Colors.GREEN}Report issues: {Colors.CYAN}https://github.com/sejalsheth/integrate-with-tech/issues{Colors.END}")
     print("=" * 70)
 
@@ -930,9 +930,9 @@ def show_comprehensive_help():
 
 def build_parser():
     ap = argparse.ArgumentParser(
-        prog="video-transcribe",
+        prog="meeting-companion",
         description=f"""
-{Colors.BOLD}🎥 Video Transcription Console Tool{Colors.END}
+{Colors.BOLD}🎥 Meeting Companion Console Tool{Colors.END}
 
 AI-powered batch transcription using OpenAI Whisper + Facebook BART summarization.
 Converts MP4 videos to accurate text transcripts with optional AI summaries.
@@ -948,7 +948,7 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
     )
 
     # Global arguments
-    ap.add_argument("--version", action="version", version="Video Transcribe v1.0.0")
+    ap.add_argument("--version", action="version", version="Meeting Companion v1.0.0")
     ap.add_argument("--no-color", action="store_true", help="Disable colored output")
     ap.add_argument("--interactive", "-i", action="store_true", help="Run interactive setup wizard")
     ap.add_argument("--check-deps", action="store_true", help="Check system dependencies")
@@ -1115,19 +1115,19 @@ def main():
         print(f"\n{Colors.YELLOW}💡 Welcome! Here's how to get started:{Colors.END}\n")
 
         print(f"{Colors.BOLD}🚀 Quick Start:{Colors.END}")
-        print(f"  {Colors.CYAN}video-transcribe --interactive{Colors.END}     # Interactive setup wizard")
-        print(f"  {Colors.CYAN}video-transcribe --check-deps{Colors.END}      # Verify your system is ready")
-        print(f"  {Colors.CYAN}video-transcribe file --browse{Colors.END}     # Browse and select a video file")
+        print(f"  {Colors.CYAN}meeting-companion --interactive{Colors.END}     # Interactive setup wizard")
+        print(f"  {Colors.CYAN}meeting-companion --check-deps{Colors.END}      # Verify your system is ready")
+        print(f"  {Colors.CYAN}meeting-companion file --browse{Colors.END}     # Browse and select a video file")
 
         print(f"\n{Colors.BOLD}📚 Learning & Help:{Colors.END}")
-        print(f"  {Colors.CYAN}video-transcribe --guide{Colors.END}          # Comprehensive usage guide")
-        print(f"  {Colors.CYAN}video-transcribe --examples{Colors.END}       # Show practical examples")
-        print(f"  {Colors.CYAN}video-transcribe --models{Colors.END}         # Available AI models info")
-        print(f"  {Colors.CYAN}video-transcribe --help{Colors.END}           # Full command reference")
+        print(f"  {Colors.CYAN}meeting-companion --guide{Colors.END}          # Comprehensive usage guide")
+        print(f"  {Colors.CYAN}meeting-companion --examples{Colors.END}       # Show practical examples")
+        print(f"  {Colors.CYAN}meeting-companion --models{Colors.END}         # Available AI models info")
+        print(f"  {Colors.CYAN}meeting-companion --help{Colors.END}           # Full command reference")
 
         print(f"\n{Colors.BOLD}⚙️  Configuration:{Colors.END}")
-        print(f"  {Colors.CYAN}video-transcribe --show-config{Colors.END}    # View saved settings")
-        print(f"  {Colors.CYAN}video-transcribe --reset-config{Colors.END}   # Reset to defaults")
+        print(f"  {Colors.CYAN}meeting-companion --show-config{Colors.END}    # View saved settings")
+        print(f"  {Colors.CYAN}meeting-companion --reset-config{Colors.END}   # Reset to defaults")
 
         print(
             f"\n{Colors.GREEN}💡 Tip: Start with {Colors.BOLD}--interactive{Colors.END}{Colors.GREEN} for guided setup!{Colors.END}"

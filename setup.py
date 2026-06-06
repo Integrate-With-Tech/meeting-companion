@@ -34,14 +34,14 @@ if sys.version_info < (3, 8):
     sys.exit(1)
 
 setup(
-    name="video-transcription-tool",
+    name="meeting-companion",
     version="1.0.0",
     description="Batch video transcription with AI-powered summarization using Whisper and BART",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Sejal Sheth",
     author_email="integratewithtech@gmail.com",
-    url="https://github.com/sejalsheth/integrate-with-tech",
+    url="https://github.com/Integrate-With-Tech/meeting-companion",
     # Package configuration
     py_modules=["transcribe_batch"],
     python_requires=">=3.8",
@@ -54,7 +54,7 @@ setup(
     # Console scripts
     entry_points={
         "console_scripts": [
-            "video-transcribe=transcribe_batch:main",
+            "meeting-companion=transcribe_batch:main",
         ],
     },
     # Classifiers
@@ -92,7 +92,7 @@ setup(
         "Homepage": "https://github.com/sejalsheth/integrate-with-tech",
         "Repository": "https://github.com/sejalsheth/integrate-with-tech.git",
         "Issues": "https://github.com/sejalsheth/integrate-with-tech/issues",
-        "Documentation": "https://github.com/sejalsheth/integrate-with-tech/blob/main/video-transcribe/README.md",
+        "Documentation": "https://github.com/Integrate-With-Tech/meeting-companion/blob/main/README.md",
     },
     # Package data
     include_package_data=True,

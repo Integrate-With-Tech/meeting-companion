@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "video-transcription-tool"
+name = "meeting-companion"
 version = "1.0.0"
 description = "Batch video transcription with AI-powered summarization using Whisper and BART"
 readme = "README.md"
@@ -58,14 +58,14 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sejalsheth/integrate-with-tech"
-Repository = "https://github.com/sejalsheth/integrate-with-tech.git"
-Issues = "https://github.com/sejalsheth/integrate-with-tech/issues"
-Changelog = "https://github.com/sejalsheth/integrate-with-tech/blob/main/Video-Transcribing/CHANGELOG.md"
-Documentation = "https://github.com/sejalsheth/integrate-with-tech/blob/main/Video-Transcribing/README.md"
+Homepage = "https://github.com/Integrate-With-Tech/meeting-companion"
+Repository = "https://github.com/Integrate-With-Tech/meeting-companion.git"
+Issues = "https://github.com/Integrate-With-Tech/meeting-companion/issues"
+Changelog = "https://github.com/Integrate-With-Tech/meeting-companion/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/Integrate-With-Tech/meeting-companion/blob/main/README.md"
 
 [project.scripts]
-video-transcribe = "transcribe_batch:main"
+meeting-companion = "transcribe_batch:main"
 
 [tool.setuptools]
 py-modules = ["transcribe_batch"]

@@ -1,4 +1,4 @@
-# Video Transcription Tool - Console Application Transformation
+# Meeting Companion - Console Application Transformation
 
 ## Summary
 
@@ -7,31 +7,36 @@ Successfully transformed the video transcription application into a comprehensiv
 ## 🎯 Key Enhancements Made
 
 ### 1. Enhanced CLI Interface ✅
-- **Interactive Setup Wizard**: `video-transcribe --interactive`
+
+- **Interactive Setup Wizard**: `meeting-companion --interactive`
 - **Comprehensive Help System**: Multiple help options (--guide, --examples, --models)
 - **Colored Output**: Visual feedback with ANSI colors and emojis
 - **Smart Welcome Screen**: Helpful guidance when no arguments provided
 - **Progress Bars**: Visual progress tracking during transcription
 
 ### 2. Configuration Management ✅
+
 - **Persistent Settings**: Save user preferences to config file
 - **Cross-Platform Config**: Supports macOS, Linux, Windows config locations
 - **Interactive Config Setup**: Guided configuration with smart defaults
 - **Config Commands**: --show-config, --reset-config options
 
 ### 3. File Selection Features ✅
+
 - **Interactive File Browser**: Browse and select files with --browse
 - **Batch File Selection**: Choose specific files from directory with --select
-- **Single File Mode**: Process individual files with `video-transcribe file`
+- **Single File Mode**: Process individual files with `meeting-companion file`
 - **Smart File Validation**: Check file existence and format
 
 ### 4. Installation & Distribution ✅
+
 - **Pip Installation**: Proper setup.py for `pip install -e .`
-- **Global Command**: `video-transcribe` command available system-wide
+- **Global Command**: `meeting-companion` command available system-wide
 - **Entry Points**: Proper console script configuration
 - **Installation Guide**: Complete INSTALL.md with instructions
 
 ### 5. Validation & Help Features ✅
+
 - **Dependency Checking**: Comprehensive system and package validation
 - **System Requirements**: Check RAM, disk space, Python version
 - **Model Information**: Detailed AI model comparison and recommendations
@@ -41,31 +46,34 @@ Successfully transformed the video transcription application into a comprehensiv
 ## 🚀 New Command Structure
 
 ### Global Commands
+
 ```bash
-video-transcribe --help              # Full help system
-video-transcribe --interactive       # Setup wizard
-video-transcribe --check-deps        # Validate system
-video-transcribe --guide            # Complete usage guide
-video-transcribe --examples         # Practical examples
-video-transcribe --models           # AI model information
-video-transcribe --show-config      # View settings
-video-transcribe --reset-config     # Reset defaults
+meeting-companion --help              # Full help system
+meeting-companion --interactive       # Setup wizard
+meeting-companion --check-deps        # Validate system
+meeting-companion --guide            # Complete usage guide
+meeting-companion --examples         # Practical examples
+meeting-companion --models           # AI model information
+meeting-companion --show-config      # View settings
+meeting-companion --reset-config     # Reset defaults
 ```
 
 ### Processing Commands
+
 ```bash
 # Batch processing
-video-transcribe run --input videos/ --output results/
-video-transcribe run --quick --input videos/ --output results/
-video-transcribe run --quality --input videos/ --output results/
-video-transcribe run --select --input videos/ --output results/
+meeting-companion run --input videos/ --output results/
+meeting-companion run --quick --input videos/ --output results/
+meeting-companion run --quality --input videos/ --output results/
+meeting-companion run --select --input videos/ --output results/
 
-# Single file processing  
-video-transcribe file --input video.mp4
-video-transcribe file --browse
+# Single file processing
+meeting-companion file --input video.mp4
+meeting-companion file --browse
 ```
 
 ### Quick Presets
+
 ```bash
 --quick     # Balanced speed/quality (small model)
 --quality   # Maximum accuracy (large-v3 model)

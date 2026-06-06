@@ -1,14 +1,14 @@
-# Video Transcription with AI Summary
+# Meeting Companion — Transcription with AI Summary
 
 <p align="center">
-  <img alt="Video Transcribe" src="https://img.shields.io/badge/Video%20Transcribe-CLI-blue">
+   <img alt="Meeting Companion" src="https://img.shields.io/badge/Meeting%20Companion-CLI-blue">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-green"></a>
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-informational">
   <img alt="Platforms" src="https://img.shields.io/badge/OS-macOS%20%7C%20Linux-lightgrey">
-  <a href="https://github.com/Integrate-With-Tech/video-transcribe/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/Integrate-With-Tech/video-transcribe/actions/workflows/ci.yml/badge.svg">
-  </a>
-  <img alt="Stars" src="https://img.shields.io/github/stars/Integrate-With-Tech/video-transcribe?style=social">
+   <a href="https://github.com/Integrate-With-Tech/meeting-companion/actions/workflows/ci.yml">
+      <img alt="CI" src="https://github.com/Integrate-With-Tech/meeting-companion/actions/workflows/ci.yml/badge.svg">
+   </a>
+   <img alt="Stars" src="https://img.shields.io/github/stars/Integrate-With-Tech/meeting-companion?style=social">
 </p>
 
 A robust batch transcription tool that processes MP4 videos using OpenAI's Whisper model (via faster-whisper) and generates AI-powered summaries using Facebook's BART model.
@@ -40,6 +40,7 @@ outputs/
 ### Output Examples
 
 **Transcript Format** (`transcript.txt`):
+
 ```
 [00:00:01,010 - 00:00:07,540] Hello everyone and welcome to today's presentation
 [00:00:07,540 - 00:00:12,619] In this video we'll be covering the main topics and key concepts
@@ -47,11 +48,12 @@ outputs/
 ```
 
 **Summary Format** (`summary.md`):
+
 ```markdown
 # Summary: VideoName
 
 - The presentation covers fundamental concepts and key topics
-- Main discussion points include practical applications and examples  
+- Main discussion points include practical applications and examples
 - The video concludes with actionable takeaways for viewers
 ```
 
@@ -62,13 +64,13 @@ outputs/
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd video-transcribe
+cd meeting-companion
 
 # Install as a global console application
 pip install -e .
 
 # Verify installation
-video-transcribe --version
+meeting-companion --version
 ```
 
 ### Prerequisites
@@ -81,18 +83,20 @@ The installer will help you check these, but you'll need:
 ### System Setup
 
 1. **Install FFmpeg**:
+
    ```bash
    # macOS (using Homebrew)
    brew install ffmpeg
-   
-   # Ubuntu/Debian  
+
+   # Ubuntu/Debian
    sudo apt update && sudo apt install ffmpeg
-   
+
    # Windows (using Chocolatey)
    choco install ffmpeg
    ```
 
 2. **Python Dependencies** (auto-installed):
+
    ```bash
    # These are installed automatically with pip install -e .
    pip install faster-whisper transformers sentencepiece torch
@@ -100,7 +104,7 @@ The installer will help you check these, but you'll need:
 
 3. **Verify Setup**:
    ```bash
-   video-transcribe --check-deps
+   meeting-companion --check-deps
    ```
 
 ## 📖 Usage
@@ -110,101 +114,106 @@ This is now a full-featured **console application** with interactive menus, conf
 ### 🚀 Quick Start (Recommended)
 
 1. **Install the application**:
+
    ```bash
    pip install -e .
    ```
 
 2. **Interactive setup** (first time):
+
    ```bash
-   video-transcribe --interactive
+   meeting-companion --interactive
    ```
 
 3. **Check your system**:
+
    ```bash
-   video-transcribe --check-deps
+   meeting-companion --check-deps
    ```
 
 4. **Process videos**:
    ```bash
-   video-transcribe run --quick --input input_mp4 --output outputs
+   meeting-companion run --quick --input input_mp4 --output outputs
    ```
 
 ### 📱 Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `video-transcribe --interactive` | 🧙‍♂️ Interactive setup wizard |
-| `video-transcribe run` | 📁 Batch process directory |
-| `video-transcribe file` | 📄 Process single file |
-| `video-transcribe --guide` | 📚 Complete usage guide |
-| `video-transcribe --check-deps` | 🔍 Verify dependencies |
-| `video-transcribe --show-config` | ⚙️ View settings |
+| Command                           | Description                 |
+| --------------------------------- | --------------------------- |
+| `meeting-companion --interactive` | 🧙‍♂️ Interactive setup wizard |
+| `meeting-companion run`           | 📁 Batch process directory  |
+| `meeting-companion file`          | 📄 Process single file      |
+| `meeting-companion --guide`       | 📚 Complete usage guide     |
+| `meeting-companion --check-deps`  | 🔍 Verify dependencies      |
+| `meeting-companion --show-config` | ⚙️ View settings            |
 
 ### 🎯 Processing Modes
 
 **Batch Processing:**
+
 ```bash
 # Quick mode (balanced speed/quality)
-video-transcribe run --quick --input videos/ --output results/
+meeting-companion run --quick --input videos/ --output results/
 
 # Quality mode (best accuracy)
-video-transcribe run --quality --input videos/ --output results/
+meeting-companion run --quality --input videos/ --output results/
 
 # Fast mode (for testing)
-video-transcribe run --fast --input videos/ --output results/
+meeting-companion run --fast --input videos/ --output results/
 
 # Select specific files interactively
-video-transcribe run --select --input videos/ --output results/
+meeting-companion run --select --input videos/ --output results/
 ```
 
 **Single File Processing:**
+
 ```bash
 # Process one file
-video-transcribe file --input myvideo.mp4 --output results/
+meeting-companion file --input myvideo.mp4 --output results/
 
 # Browse and select file interactively
-video-transcribe file --browse
+meeting-companion file --browse
 ```
 
 ### 🌍 Language Options
 
 ```bash
 # Auto-detect language (recommended)
-video-transcribe run --language auto --input videos/ --output results/
+meeting-companion run --language auto --input videos/ --output results/
 
 # Specific languages
-video-transcribe run --language en --input videos/ --output results/  # English
-video-transcribe run --language es --input videos/ --output results/  # Spanish
-video-transcribe run --language fr --input videos/ --output results/  # French
+meeting-companion run --language en --input videos/ --output results/  # English
+meeting-companion run --language es --input videos/ --output results/  # Spanish
+meeting-companion run --language fr --input videos/ --output results/  # French
 ```
 
 ### 🤖 Model Selection
 
 ```bash
 # Available models (size vs accuracy tradeoff)
-video-transcribe --models  # Show model information
+meeting-companion --models  # Show model information
 
 # Use specific model
-video-transcribe run --model tiny --input videos/ --output results/     # Fastest
-video-transcribe run --model small --input videos/ --output results/    # Balanced  
-video-transcribe run --model large-v3 --input videos/ --output results/ # Best quality
+meeting-companion run --model tiny --input videos/ --output results/     # Fastest
+meeting-companion run --model small --input videos/ --output results/    # Balanced
+meeting-companion run --model large-v3 --input videos/ --output results/ # Best quality
 ```
 
 ### Command Line Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--input` | Required | Directory containing MP4 files |
-| `--output` | Required | Directory for output files |
-| `--model` | `large-v3` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
-| `--language` | `auto` | Language code (`en`, `es`, `fr`, etc.) or `auto` for detection |
-| `--compute-type` | `int8` | Computation precision (`auto`, `int8`, `int16`, `float16`) |
-| `--beam` | `5` | Beam size for decoding (higher = more accurate, slower) |
-| `--timeout` | `0` | Maximum processing time per file in seconds (0 = no limit) |
-| `--retries` | `2` | Number of retry attempts for failed files |
-| `--progress-timeout` | `180` | Abort if no progress for N seconds |
-| `--summarizer` | `bart` | Summarization method (`bart` or `none`) |
-| `--summary-max` | `8` | Maximum sentences in summary |
+| Option               | Default    | Description                                                        |
+| -------------------- | ---------- | ------------------------------------------------------------------ |
+| `--input`            | Required   | Directory containing MP4 files                                     |
+| `--output`           | Required   | Directory for output files                                         |
+| `--model`            | `large-v3` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
+| `--language`         | `auto`     | Language code (`en`, `es`, `fr`, etc.) or `auto` for detection     |
+| `--compute-type`     | `int8`     | Computation precision (`auto`, `int8`, `int16`, `float16`)         |
+| `--beam`             | `5`        | Beam size for decoding (higher = more accurate, slower)            |
+| `--timeout`          | `0`        | Maximum processing time per file in seconds (0 = no limit)         |
+| `--retries`          | `2`        | Number of retry attempts for failed files                          |
+| `--progress-timeout` | `180`      | Abort if no progress for N seconds                                 |
+| `--summarizer`       | `bart`     | Summarization method (`bart` or `none`)                            |
+| `--summary-max`      | `8`        | Maximum sentences in summary                                       |
 
 ## 🎯 VS Code Integration
 
@@ -217,7 +226,7 @@ The project includes a VS Code launch configuration for easy debugging:
 
 ## 🔧 Performance Tips
 
-- **Model Selection**: 
+- **Model Selection**:
   - `tiny`: Fastest, least accurate
   - `base`: Good balance for quick processing
   - `large-v3`: Most accurate, slower (recommended for quality)
@@ -237,11 +246,13 @@ The project includes a VS Code launch configuration for easy debugging:
 ### Common Issues
 
 1. **"No module named 'faster_whisper'"**
+
    ```bash
    pip install faster-whisper
    ```
 
 2. **FFmpeg not found**
+
    ```bash
    # Ensure FFmpeg is in your PATH
    ffmpeg -version
@@ -278,15 +289,17 @@ The project includes a VS Code launch configuration for easy debugging:
 
 **Personal Use License** - This project is free for personal, educational, and non-commercial use.
 
-**Commercial Use Restrictions** - Commercial use requires explicit permission and licensing. 
+**Commercial Use Restrictions** - Commercial use requires explicit permission and licensing.
 
 ### ✅ Allowed (Personal Use):
+
 - Personal projects and learning
 - Academic research and education
-- Non-profit organizations  
+- Non-profit organizations
 - Open source contributions
 
 ### ❌ Requires Permission (Commercial Use):
+
 - Business or commercial environments
 - Providing transcription services for payment
 - Commercial products or services

@@ -37,18 +37,18 @@ class TestConsoleApplication(unittest.TestCase):
         """Test that help command works"""
         result = self.run_script(["--help"], expect_success=False)
         # Help exits with code 0 but argparse uses SystemExit
-        self.assertIn("Video Transcription Console Tool", result.stdout)
+        self.assertIn("Meeting Companion Console Tool", result.stdout)
 
     def test_version_command(self):
         """Test version command"""
         result = self.run_script(["--version"], expect_success=False)
-        self.assertIn("Video Transcribe", result.stderr or result.stdout)
+        self.assertIn("Meeting Companion", result.stderr or result.stdout)
 
     def test_examples_command(self):
         """Test examples command"""
         result = self.run_script(["--examples"])
         self.assertIn("Usage Examples", result.stdout)
-        self.assertIn("video-transcribe", result.stdout)
+        self.assertIn("meeting-companion", result.stdout)
 
     def test_models_command(self):
         """Test models info command"""
