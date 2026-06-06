@@ -161,14 +161,19 @@ class NotesUIService:
         viewer_id: str,
         is_admin: bool,
         filters: Dict[str, str],
+        limit: int = 100,
     ) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
-        for job in self._jobs.list_by_tenant(tenant_id, limit=500):
+        jobs = self._jobs.list_by_tenant(tenant_id, limit=limit)
+        job_ids = [str(job.get("id")) for job in jobs if job.get("id")]
+        notes_by_job = self._group_rows_by_job_id("generated_notes", job_ids)
+        uploads_by_job = self._group_rows_by_job_id("sharepoint_uploads", job_ids)
+        for job in jobs:
             if not is_admin and viewer_id and str(job.get("created_by", "")) != viewer_id:
                 continue
-            notes_rows = self._notes.list_by_job(job["id"])
+            notes_rows = notes_by_job.get(str(job["id"]), [])
             notes_content = notes_rows[0]["content"] if notes_rows else ""
-            uploads = self._uploads.list_by_job(job["id"])
+            uploads = uploads_by_job.get(str(job["id"]), [])
             created_at = str(job.get("created_at") or "")
             item = {
                 "meeting_job_id": job["id"],
@@ -195,6 +200,24 @@ class NotesUIService:
                 continue
             filtered.append(row)
         return filtered
+
+    def _group_rows_by_job_id(self, table_name: str, job_ids: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+        if not job_ids:
+            return {}
+        try:
+            rows = self._client.table(table_name).select("*").in_("meeting_job_id", job_ids).execute().data
+        except Exception:
+            rows = []
+            for meeting_job_id in job_ids:
+                if table_name == "generated_notes":
+                    rows.extend(self._notes.list_by_job(meeting_job_id))
+                elif table_name == "sharepoint_uploads":
+                    rows.extend(self._uploads.list_by_job(meeting_job_id))
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for row in rows:
+            key = str(row.get("meeting_job_id", ""))
+            grouped.setdefault(key, []).append(row)
+        return grouped
 
     def get_note_detail(
         self, *, tenant_id: str, meeting_job_id: str, viewer_id: str, is_admin: bool
@@ -344,6 +367,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         tenant_id: str = Query("default"),
         viewer_id: str = Query(""),
         is_admin: bool = Query(False),
+        limit: int = Query(100, ge=1, le=1000),
         date: str = Query(""),
         organizer: str = Query(""),
         status: str = Query(""),
@@ -357,7 +381,13 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
             "transcript_source": transcript_source,
             "upload_status": upload_status,
         }
-        notes = _service().list_notes(tenant_id=tenant_id, viewer_id=viewer_id, is_admin=is_admin, filters=filters)
+        notes = _service().list_notes(
+            tenant_id=tenant_id,
+            viewer_id=viewer_id,
+            is_admin=is_admin,
+            filters=filters,
+            limit=limit,
+        )
         return templates.TemplateResponse(
             request=request,
             name="notes_history.html",

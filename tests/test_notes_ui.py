@@ -69,7 +69,7 @@ class _FakeUIService:
             {"label": "Webhook status", "ready": False},
         ]
 
-    def list_notes(self, *, tenant_id, viewer_id, is_admin, filters):
+    def list_notes(self, *, tenant_id, viewer_id, is_admin, filters, limit=100):
         rows = list(self.notes)
         if filters.get("status"):
             rows = [r for r in rows if r["status"] == filters["status"]]
