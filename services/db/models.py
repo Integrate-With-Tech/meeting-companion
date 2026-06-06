@@ -1,10 +1,10 @@
 """
 Python dataclasses mirroring every Supabase/Postgres table.
 
-Each class maps one-to-one with a table defined in
-``migrations/001_initial_schema.sql``.  Fields that are nullable in the
-schema are typed ``Optional[…]`` with a default of ``None`` so that callers
-can construct partial objects when not all columns are relevant.
+Each class maps one-to-one with a table defined in the migrations under
+``migrations/``.  Fields that are nullable in the schema are typed
+``Optional[…]`` with a default of ``None`` so that callers can construct
+partial objects when not all columns are relevant.
 
 Timestamps coming from Supabase are returned as ISO-8601 strings.  This
 module does *not* coerce them to :class:`datetime` objects to keep the layer
@@ -12,7 +12,49 @@ lightweight and dependency-free.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+# ---------------------------------------------------------------------------
+# profiles  (keyed to auth.users)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class UserProfile:
+    """Row in the ``profiles`` table.
+
+    ``id`` mirrors ``auth.users.id`` and is therefore required.
+    """
+
+    id: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# microsoft_connections
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class MicrosoftConnection:
+    """Row in the ``microsoft_connections`` table."""
+
+    owner_user_id: str
+    microsoft_user_oid: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    tenant_id: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_expires_at: Optional[str] = None
+    scopes: Optional[List[str]] = None
+    id: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
 
 # ---------------------------------------------------------------------------
 # tenant_settings
@@ -80,6 +122,7 @@ class MeetingJob:
     output_tokens: Optional[int] = None
     error_message: Optional[str] = None
     created_by: Optional[str] = None
+    owner_user_id: Optional[str] = None
     id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -99,6 +142,7 @@ class MeetingArtifact:
     storage_path: str
     checksum: Optional[str] = None
     size_bytes: Optional[int] = None
+    owner_user_id: Optional[str] = None
     id: Optional[str] = None
     created_at: Optional[str] = None
 
@@ -118,6 +162,7 @@ class GeneratedNotes:
     model_version: Optional[str] = None
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
+    owner_user_id: Optional[str] = None
     id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -142,6 +187,7 @@ class SharePointUpload:
     upload_status: str = "pending"
     error_message: Optional[str] = None
     uploaded_at: Optional[str] = None
+    owner_user_id: Optional[str] = None
     id: Optional[str] = None
     created_at: Optional[str] = None
 
