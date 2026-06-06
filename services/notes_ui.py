@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from services.db import get_client
@@ -695,6 +695,10 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
             name="sign_in.html",
             context={"magic_link_sent": True, "email": email},
         )
+
+    @app.get("/auth/sign-in/magic-link")
+    def magic_link_get_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/auth/sign-in", status_code=303)
 
     @app.get("/auth/sign-in/social", response_class=HTMLResponse)
     def social_sign_in(

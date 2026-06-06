@@ -294,6 +294,11 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn("test@example.com", response.text)
         self.assertIn("Magic link sent", response.text)
 
+    def test_magic_link_get_redirects_to_sign_in(self):
+        response = self.client.get("/auth/sign-in/magic-link", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/auth/sign-in")
+
     def test_social_login_route_accepts_supported_provider(self):
         response = self.client.get("/auth/sign-in/social?provider=google&user_id=user-2&email=u2@example.com")
         self.assertEqual(response.status_code, 200)
