@@ -12,9 +12,7 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple
 
 from services.db.models import AuditEvent, MeetingArtifact
 
-_TIMESTAMP_RE = re.compile(
-    r"^(?P<start>\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(?P<end>\d{2}:\d{2}:\d{2}\.\d{3})(?:\s+.*)?$"
-)
+_TIMESTAMP_RE = re.compile(r"^(?P<start>\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(?P<end>\d{2}:\d{2}:\d{2}\.\d{3})(?:\s+.*)?$")
 _SPEAKER_TAG_RE = re.compile(r"^<v(?:\s+([^>]+))?>(.*)$", re.IGNORECASE)
 _ALLOWED_SPEAKER_CHARS = " .'-"
 
@@ -198,11 +196,7 @@ def ingest_teams_native_artifacts(
         download_url = artifact.get("download_url")
         artifact_id = artifact.get("id")
         storage_candidate = (
-            download_url
-            if isinstance(download_url, str)
-            else artifact_id
-            if isinstance(artifact_id, str)
-            else ""
+            download_url if isinstance(download_url, str) else artifact_id if isinstance(artifact_id, str) else ""
         )
         storage_path = storage_candidate.strip()
         if not storage_path:
