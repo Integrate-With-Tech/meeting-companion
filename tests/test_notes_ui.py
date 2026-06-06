@@ -10,12 +10,13 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.notes_ui import create_app  # noqa: E402
+from services.notes_ui import NotesUIService, create_app  # noqa: E402
 
 
 class _FakeUIService:
     def __init__(self):
         self.saved = {}
+        self.audit_events = []
         self.notes = [
             {
                 "meeting_job_id": "job-1",
@@ -142,6 +143,41 @@ class _FakeUIService:
             return True
         return False
 
+    def _append_audit(self, event):
+        self.audit_events.append(event)
+
+    def upsert_user_profile(self, user_id, *, email="", display_name=""):
+        if not user_id:
+            return None
+        self._profiles[user_id] = {"id": user_id, "email": email, "display_name": display_name}
+        return self._profiles[user_id]
+
+    def connect_microsoft(
+        self,
+        user_id,
+        *,
+        microsoft_user_oid,
+        email="",
+        display_name="",
+        tenant_id="",
+        access_token="",
+        refresh_token="",
+    ):
+        if not user_id or not microsoft_user_oid:
+            return None
+        conn = {
+            "id": f"conn-{len(self._ms_connections)+1}",
+            "owner_user_id": user_id,
+            "microsoft_user_oid": microsoft_user_oid,
+            "email": email,
+            "display_name": display_name or email,
+            "tenant_id": tenant_id,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+        }
+        self._ms_connections[conn["id"]] = conn
+        return conn
+
 
 class TestNotesUIRoutes(unittest.TestCase):
     def setUp(self):
@@ -222,6 +258,15 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn("test@example.com", response.text)
         self.assertIn("Magic link sent", response.text)
 
+    def test_social_login_route_accepts_supported_provider(self):
+        response = self.client.get("/auth/sign-in/social?provider=google&user_id=user-2&email=u2@example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Social Login", response.text)
+
+    def test_social_login_route_rejects_unsupported_provider(self):
+        response = self.client.get("/auth/sign-in/social?provider=entra")
+        self.assertEqual(response.status_code, 400)
+
     def test_account_page_shows_profile(self):
         response = self.client.get("/auth/account?user_id=user-1")
         self.assertEqual(response.status_code, 200)
@@ -263,6 +308,14 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # connection still exists for user-1 even after wrong-user attempt
         self.assertIn("conn-1", str(self.service._ms_connections))
+
+    def test_connect_microsoft_route_creates_connection(self):
+        response = self.client.get(
+            "/auth/microsoft/connect?user_id=user-2&microsoft_user_oid=ms-oid-2&email=user2@contoso.com"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Connected", response.text)
+        self.assertIn("user2@contoso.com", response.text)
 
 
 class TestMicrosoftConnectionGating(unittest.TestCase):
@@ -349,6 +402,80 @@ class TestNotesUIMicrosoftServiceMethods(unittest.TestCase):
     def test_disconnect_microsoft_missing_ids(self):
         self.assertFalse(self.service.disconnect_microsoft("", "conn-1"))
         self.assertFalse(self.service.disconnect_microsoft("user-1", ""))
+
+
+class _AuditSink:
+    def __init__(self):
+        self.events = []
+
+    def append(self, event):
+        self.events.append(event)
+        return event
+
+
+class _JobsStub:
+    def __init__(self, by_user=None, by_tenant=None, by_id=None):
+        self._by_user = by_user or []
+        self._by_tenant = by_tenant or []
+        self._by_id = by_id or {}
+
+    def list_by_user(self, owner_user_id, limit=100):
+        return list(self._by_user)
+
+    def list_by_tenant(self, tenant_id, limit=100):
+        return list(self._by_tenant)
+
+    def get(self, job_id):
+        return self._by_id.get(job_id)
+
+
+class _RowsStub:
+    def list_by_job(self, meeting_job_id):
+        return []
+
+
+class TestNotesUIServiceOwnership(unittest.TestCase):
+    def _make_service(self):
+        service = object.__new__(NotesUIService)
+        service._audit = _AuditSink()
+        service._notes = _RowsStub()
+        service._uploads = _RowsStub()
+        service._artifacts = _RowsStub()
+        service._group_rows_by_job_id = lambda table_name, job_ids: {}
+        return service
+
+    def test_list_notes_filters_non_owner_rows(self):
+        service = self._make_service()
+        service._jobs = _JobsStub(
+            by_user=[
+                {"id": "job-1", "owner_user_id": "user-1", "created_at": "2026-06-01", "status": "completed"},
+                {"id": "job-2", "owner_user_id": "user-2", "created_at": "2026-06-02", "status": "completed"},
+            ]
+        )
+        rows = service.list_notes(
+            tenant_id="t-1",
+            viewer_id="user-1",
+            is_admin=False,
+            filters={},
+            limit=20,
+        )
+        self.assertEqual([row["meeting_job_id"] for row in rows], ["job-1"])
+
+    def test_get_note_detail_denies_non_owner(self):
+        service = self._make_service()
+        service._jobs = _JobsStub(
+            by_id={
+                "job-1": {
+                    "id": "job-1",
+                    "tenant_id": "t-1",
+                    "owner_user_id": "user-2",
+                    "meeting_id": "meeting-a",
+                    "created_at": "2026-06-01T00:00:00+00:00",
+                }
+            }
+        )
+        detail = service.get_note_detail(tenant_id="t-1", meeting_job_id="job-1", viewer_id="user-1", is_admin=False)
+        self.assertIsNone(detail)
 
 
 if __name__ == "__main__":
