@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Setup</title>
+</head>
+<body>
+  <h1>Admin Setup</h1>
+  {% if saved %}<p>Settings saved.</p>{% endif %}
+  <form method="post" action="/admin/setup">
+    <input type="hidden" name="tenant_id" value="{{ tenant_id }}" />
+
+    <h2>Microsoft Graph</h2>
+    <label>Client ID <input name="graph_client_id" value="{{ settings.graph_client_id }}" /></label><br />
+    <label>Tenant ID <input name="graph_tenant_id" value="{{ settings.graph_tenant_id }}" /></label><br />
+    <label>Client Secret <input name="graph_client_secret" value="{{ settings.graph_client_secret }}" /></label><br />
+
+    <h2>SharePoint</h2>
+    <label>Site ID <input name="sharepoint_site_id" value="{{ settings.sharepoint_site_id }}" /></label><br />
+    <label>Drive ID <input name="sharepoint_drive_id" value="{{ settings.sharepoint_drive_id }}" /></label><br />
+    <label>Folder Path <input name="sharepoint_folder_path" value="{{ settings.sharepoint_folder_path }}" /></label><br />
+
+    <h2>OpenAI</h2>
+    <label>API Key <input name="openai_api_key" value="{{ settings.openai_api_key }}" /></label><br />
+    <label>Model <input name="openai_model" value="{{ settings.openai_model }}" /></label><br />
+
+    <h2>Supabase</h2>
+    <label>URL <input name="supabase_url" value="{{ settings.supabase_url }}" /></label><br />
+    <label>Key <input name="supabase_key" value="{{ settings.supabase_key }}" /></label><br />
+
+    <h2>Webhook</h2>
+    <label>Webhook URL <input name="webhook_url" value="{{ settings.webhook_url }}" /></label><br />
+
+    <button type="submit">Save Settings</button>
+  </form>
+
+  <p><a href="/admin/readiness?tenant_id={{ tenant_id }}">View readiness checklist</a></p>
+</body>
+</html>

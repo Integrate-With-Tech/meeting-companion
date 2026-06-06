@@ -66,6 +66,28 @@ For app/worker integrations, generated meeting notes are exposed as:
 - `{meeting-date}-{meeting-title}-notes.md`
 - `{meeting-date}-{meeting-title}-notes.json`
 
+## 🌐 FastAPI Notes UI (v1)
+
+The repository includes a server-rendered FastAPI UI for:
+
+- Admin setup for Microsoft Graph, SharePoint, OpenAI, and Supabase values
+- Readiness checklist verification
+- Notes history filtering (date, organizer, status, transcript source, upload status)
+- Meeting detail views with agenda/action items/decisions and SharePoint links
+- Local Markdown/JSON note downloads
+
+Run locally:
+
+```bash
+uvicorn services.notes_ui:app --reload
+```
+
+Then open:
+
+- `http://127.0.0.1:8000/admin/setup`
+- `http://127.0.0.1:8000/admin/readiness`
+- `http://127.0.0.1:8000/notes/history`
+
 ## 🛠️ Installation
 
 ### Quick Installation
