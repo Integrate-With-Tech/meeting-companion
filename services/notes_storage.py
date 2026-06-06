@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol
 
-from services.db.models import GeneratedNotes, MeetingArtifact, SharePointUpload
+from services.db.models import AuditEvent, GeneratedNotes, MeetingArtifact, SharePointUpload
 
 
 @dataclass
@@ -186,6 +186,10 @@ def persist_generated_notes(
     artifacts_repo: Any,
     sharepoint_uploads_repo: Any,
     storage_adapter: Optional[NotesStorageAdapter] = None,
+    audit_repo: Optional[Any] = None,
+    tenant_id: Optional[str] = None,
+    owner_user_id: Optional[str] = None,
+    actor_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Persist generated notes/artifacts and attempt SharePoint uploads.
@@ -200,6 +204,18 @@ def persist_generated_notes(
     )
 
     notes_row = generated_notes_repo.create(GeneratedNotes(meeting_job_id=meeting_job_id, content=markdown_notes))
+    if audit_repo is not None:
+        audit_repo.append(
+            AuditEvent(
+                event_type="notes.generated",
+                actor_id=owner_user_id,
+                actor_email=actor_email,
+                tenant_id=tenant_id,
+                resource_type="generated_notes",
+                resource_id=str(notes_row.get("id", "")) or None,
+                metadata={"meeting_job_id": meeting_job_id},
+            )
+        )
 
     artifact_rows: List[Dict[str, Any]] = []
     artifact_by_key: Dict[str, Dict[str, Any]] = {}
@@ -243,6 +259,22 @@ def persist_generated_notes(
                         uploaded_at=upload_result.uploaded_at or _utc_now_iso(),
                     )
                 )
+                if audit_repo is not None:
+                    audit_repo.append(
+                        AuditEvent(
+                            event_type="sharepoint.upload_succeeded",
+                            actor_id=owner_user_id,
+                            actor_email=actor_email,
+                            tenant_id=tenant_id,
+                            resource_type="sharepoint_upload",
+                            resource_id=str(upload_row.get("id", "")) or None,
+                            metadata={
+                                "meeting_job_id": meeting_job_id,
+                                "artifact_id": artifact_row.get("id"),
+                                "filename": export_file.filename,
+                            },
+                        )
+                    )
             except Exception as exc:  # pragma: no cover - validated via tests
                 upload_row = sharepoint_uploads_repo.create(
                     SharePointUpload(
@@ -256,6 +288,23 @@ def persist_generated_notes(
                         uploaded_at=_utc_now_iso(),
                     )
                 )
+                if audit_repo is not None:
+                    audit_repo.append(
+                        AuditEvent(
+                            event_type="sharepoint.upload_failed",
+                            actor_id=owner_user_id,
+                            actor_email=actor_email,
+                            tenant_id=tenant_id,
+                            resource_type="sharepoint_upload",
+                            resource_id=str(upload_row.get("id", "")) or None,
+                            metadata={
+                                "meeting_job_id": meeting_job_id,
+                                "artifact_id": artifact_row.get("id"),
+                                "filename": export_file.filename,
+                                "error": str(exc),
+                            },
+                        )
+                    )
             upload_rows.append(upload_row)
 
     return {

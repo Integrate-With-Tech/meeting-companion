@@ -32,6 +32,15 @@ class _MemoryRepo:
         return payload
 
 
+class _AuditRepo:
+    def __init__(self):
+        self.events = []
+
+    def append(self, event):
+        self.events.append(asdict(event))
+        return self.events[-1]
+
+
 class _SuccessAdapter:
     def upload_text(self, *, destination, filename, text_content, content_type):
         return NotesUploadResult(
@@ -79,6 +88,7 @@ class TestPersistGeneratedNotes(unittest.TestCase):
         notes_repo = _MemoryRepo()
         artifacts_repo = _MemoryRepo()
         uploads_repo = _MemoryRepo()
+        audit_repo = _AuditRepo()
 
         result = persist_generated_notes(
             meeting_job_id="job-1",
@@ -91,6 +101,10 @@ class TestPersistGeneratedNotes(unittest.TestCase):
             artifacts_repo=artifacts_repo,
             sharepoint_uploads_repo=uploads_repo,
             storage_adapter=_SuccessAdapter(),
+            audit_repo=audit_repo,
+            tenant_id="tenant-1",
+            owner_user_id="user-1",
+            actor_email="user-1@example.com",
         )
 
         self.assertEqual(len(notes_repo.rows), 1)
@@ -100,11 +114,16 @@ class TestPersistGeneratedNotes(unittest.TestCase):
         self.assertEqual(len(result["downloads"]), 2)
         self.assertTrue(any(d["filename"].endswith(".md") for d in result["downloads"]))
         self.assertTrue(any(d["filename"].endswith(".json") for d in result["downloads"]))
+        self.assertEqual(
+            [evt["event_type"] for evt in audit_repo.events],
+            ["notes.generated", "sharepoint.upload_succeeded", "sharepoint.upload_succeeded"],
+        )
 
     def test_keeps_local_exports_when_sharepoint_upload_fails(self):
         notes_repo = _MemoryRepo()
         artifacts_repo = _MemoryRepo()
         uploads_repo = _MemoryRepo()
+        audit_repo = _AuditRepo()
 
         result = persist_generated_notes(
             meeting_job_id="job-2",
@@ -117,6 +136,7 @@ class TestPersistGeneratedNotes(unittest.TestCase):
             artifacts_repo=artifacts_repo,
             sharepoint_uploads_repo=uploads_repo,
             storage_adapter=_FailAdapter(),
+            audit_repo=audit_repo,
         )
 
         self.assertEqual(len(result["downloads"]), 2)
@@ -125,6 +145,10 @@ class TestPersistGeneratedNotes(unittest.TestCase):
         for row in uploads_repo.rows:
             self.assertIn("upload failed for", row["error_message"])
             self.assertIsNone(row["sharepoint_item_id"])
+        self.assertEqual(
+            [evt["event_type"] for evt in audit_repo.events],
+            ["notes.generated", "sharepoint.upload_failed", "sharepoint.upload_failed"],
+        )
 
 
 if __name__ == "__main__":

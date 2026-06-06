@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from services.db import get_client
 from services.db.models import TenantSettings
+from services.db.models import AuditEvent, MicrosoftConnection, UserProfile
 from services.db.repository import (
     AuditEventRepository,
     GeneratedNotesRepository,
@@ -81,6 +82,12 @@ class NotesUIService:
         self._audit = AuditEventRepository(self._client)
         self._profiles = UserProfileRepository(self._client)
         self._ms_connections = MicrosoftConnectionRepository(self._client)
+
+    def _append_audit(self, event: AuditEvent) -> None:
+        try:
+            self._audit.append(event)
+        except Exception:
+            return
 
     def get_setup_settings(self, tenant_id: str) -> Dict[str, Any]:
         row = self._tenant_settings.get_by_tenant(tenant_id) or {}
@@ -168,12 +175,15 @@ class NotesUIService:
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
-        jobs = self._jobs.list_by_tenant(tenant_id, limit=limit)
+        if not is_admin and viewer_id:
+            jobs = self._jobs.list_by_user(viewer_id, limit=limit)
+        else:
+            jobs = self._jobs.list_by_tenant(tenant_id, limit=limit)
         job_ids = [str(job.get("id")) for job in jobs if job.get("id")]
         notes_by_job = self._group_rows_by_job_id("generated_notes", job_ids)
         uploads_by_job = self._group_rows_by_job_id("sharepoint_uploads", job_ids)
         for job in jobs:
-            if not is_admin and viewer_id and str(job.get("created_by", "")) != viewer_id:
+            if not is_admin and viewer_id and str(job.get("owner_user_id", "")) != viewer_id:
                 continue
             notes_rows = notes_by_job.get(str(job["id"]), [])
             notes_content = notes_rows[0]["content"] if notes_rows else ""
@@ -203,6 +213,15 @@ class NotesUIService:
             if filters.get("upload_status") and row["upload_status"] != filters["upload_status"]:
                 continue
             filtered.append(row)
+        self._append_audit(
+            AuditEvent(
+                event_type="user_access.notes_history_viewed",
+                actor_id=viewer_id or None,
+                tenant_id=tenant_id,
+                resource_type="notes_history",
+                metadata={"result_count": len(filtered), "is_admin": is_admin},
+            )
+        )
         return filtered
 
     def _group_rows_by_job_id(self, table_name: str, job_ids: List[str]) -> Dict[str, List[Dict[str, Any]]]:
@@ -229,7 +248,7 @@ class NotesUIService:
         job = self._jobs.get(meeting_job_id)
         if not job or str(job.get("tenant_id")) != tenant_id:
             return None
-        if not is_admin and viewer_id and str(job.get("created_by", "")) != viewer_id:
+        if not is_admin and viewer_id and str(job.get("owner_user_id", "")) != viewer_id:
             return None
 
         notes_rows = self._notes.list_by_job(meeting_job_id)
@@ -242,6 +261,16 @@ class NotesUIService:
         audit_events = self._audit.list_by_resource("meeting_job", meeting_job_id, limit=50)
 
         meeting_title = _first_title(content, str(job.get("meeting_id") or meeting_job_id))
+        self._append_audit(
+            AuditEvent(
+                event_type="user_access.meeting_notes_viewed",
+                actor_id=viewer_id or None,
+                tenant_id=tenant_id,
+                resource_type="meeting_job",
+                resource_id=meeting_job_id,
+                metadata={"is_admin": is_admin},
+            )
+        )
         return {
             "meeting_job_id": meeting_job_id,
             "meeting_title": meeting_title,
@@ -266,11 +295,20 @@ class NotesUIService:
         meeting_date = detail.get("meeting_date") or datetime.now(timezone.utc).date().isoformat()
         stem = f"{meeting_date}-{_slugify(str(detail.get('meeting_title') or 'meeting'))}-notes"
         if fmt == "markdown":
-            return {
+            export = {
                 "filename": f"{stem}.md",
                 "content": str(detail.get("content") or ""),
                 "content_type": "text/markdown; charset=utf-8",
             }
+            self._append_audit(
+                AuditEvent(
+                    event_type="user_access.notes_downloaded",
+                    resource_type="meeting_job",
+                    resource_id=str(detail.get("meeting_job_id") or ""),
+                    metadata={"format": fmt},
+                )
+            )
+            return export
         if fmt == "json":
             payload = {
                 "meeting_job_id": detail["meeting_job_id"],
@@ -287,11 +325,20 @@ class NotesUIService:
                 "audit_status": detail["audit_status"],
                 "sharepoint_links": detail["sharepoint_links"],
             }
-            return {
+            export = {
                 "filename": f"{stem}.json",
                 "content": json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                 "content_type": "application/json; charset=utf-8",
             }
+            self._append_audit(
+                AuditEvent(
+                    event_type="user_access.notes_downloaded",
+                    resource_type="meeting_job",
+                    resource_id=str(detail.get("meeting_job_id") or ""),
+                    metadata={"format": fmt},
+                )
+            )
+            return export
         raise ValueError(f"Unsupported format {fmt!r}")
 
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -322,7 +369,67 @@ class NotesUIService:
         if not conn or str(conn.get("owner_user_id")) != user_id:
             return False
         self._ms_connections.delete(connection_id)
+        self._append_audit(
+            AuditEvent(
+                event_type="microsoft_connection.disconnected",
+                actor_id=user_id,
+                resource_type="microsoft_connection",
+                resource_id=connection_id,
+            )
+        )
         return True
+
+    def upsert_user_profile(self, user_id: str, *, email: str = "", display_name: str = "") -> Optional[Dict[str, Any]]:
+        if not user_id:
+            return None
+        profile = self._profiles.upsert(UserProfile(id=user_id, email=email or None, display_name=display_name or None))
+        self._append_audit(
+            AuditEvent(
+                event_type="auth.sign_in",
+                actor_id=user_id,
+                actor_email=email or None,
+                resource_type="profile",
+                resource_id=user_id,
+                metadata={"method": "social_or_callback"},
+            )
+        )
+        return profile
+
+    def connect_microsoft(
+        self,
+        user_id: str,
+        *,
+        microsoft_user_oid: str,
+        email: str = "",
+        display_name: str = "",
+        tenant_id: str = "",
+        access_token: str = "",
+        refresh_token: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        if not user_id or not microsoft_user_oid:
+            return None
+        row = self._ms_connections.upsert(
+            MicrosoftConnection(
+                owner_user_id=user_id,
+                microsoft_user_oid=microsoft_user_oid,
+                email=email or None,
+                display_name=display_name or None,
+                tenant_id=tenant_id or None,
+                access_token=access_token or None,
+                refresh_token=refresh_token or None,
+            )
+        )
+        self._append_audit(
+            AuditEvent(
+                event_type="microsoft_connection.connected",
+                actor_id=user_id,
+                actor_email=email or None,
+                resource_type="microsoft_connection",
+                resource_id=str(row.get("id", "")) or None,
+                metadata={"microsoft_user_oid": microsoft_user_oid},
+            )
+        )
+        return row
 
 
 def create_app(data_service: Optional[Any] = None) -> FastAPI:
@@ -498,10 +605,46 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
 
     @app.post("/auth/sign-in/magic-link", response_class=HTMLResponse)
     def send_magic_link(request: Request, email: str = Form(...)) -> HTMLResponse:
+        _service()._append_audit(
+            AuditEvent(
+                event_type="auth.magic_link_requested",
+                actor_email=email,
+                resource_type="auth_request",
+                metadata={"method": "magic_link"},
+            )
+        )
         return templates.TemplateResponse(
             request=request,
             name="sign_in.html",
             context={"magic_link_sent": True, "email": email},
+        )
+
+    @app.get("/auth/sign-in/social", response_class=HTMLResponse)
+    def social_sign_in(
+        request: Request,
+        provider: str = Query(...),
+        user_id: str = Query(""),
+        email: str = Query(""),
+        display_name: str = Query(""),
+    ) -> HTMLResponse:
+        normalized_provider = provider.lower().strip()
+        if normalized_provider not in {"google", "github"}:
+            raise HTTPException(status_code=400, detail="Unsupported social provider")
+        if user_id:
+            _service().upsert_user_profile(user_id, email=email, display_name=display_name)
+        _service()._append_audit(
+            AuditEvent(
+                event_type="auth.social_sign_in_requested",
+                actor_id=user_id or None,
+                actor_email=email or None,
+                resource_type="auth_request",
+                metadata={"provider": normalized_provider},
+            )
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="sign_in.html",
+            context={"magic_link_sent": False, "email": email},
         )
 
     @app.get("/auth/account", response_class=HTMLResponse)
@@ -536,6 +679,41 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
                 "profile": profile,
                 "microsoft_connections": connections,
                 "disconnected": True,
+            },
+        )
+
+    @app.get("/auth/microsoft/connect", response_class=HTMLResponse)
+    def connect_microsoft_get(
+        request: Request,
+        user_id: str = Query(""),
+        microsoft_user_oid: str = Query(""),
+        email: str = Query(""),
+        display_name: str = Query(""),
+        tenant_id: str = Query(""),
+        access_token_ref: str = Query(""),
+        refresh_token_ref: str = Query(""),
+    ) -> HTMLResponse:
+        if user_id:
+            oid = microsoft_user_oid or f"oid-{user_id}"
+            _service().connect_microsoft(
+                user_id,
+                microsoft_user_oid=oid,
+                email=email,
+                display_name=display_name,
+                tenant_id=tenant_id,
+                access_token=access_token_ref,
+                refresh_token=refresh_token_ref,
+            )
+        profile = _service().get_user_profile(user_id)
+        connections = _service().list_microsoft_connections(user_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="account.html",
+            context={
+                "user_id": user_id,
+                "profile": profile,
+                "microsoft_connections": connections,
+                "disconnected": False,
             },
         )
 
