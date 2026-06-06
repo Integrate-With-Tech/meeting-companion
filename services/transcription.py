@@ -42,6 +42,7 @@ def load_whisper(model_size: str, compute_type: str):
     global _WM
     if _WM is None:
         from faster_whisper import WhisperModel as _WM_
+
         _WM = _WM_
     return _WM(model_size, compute_type=compute_type)
 
@@ -113,11 +114,7 @@ def transcribe_audio(
                 current_pos = int(seg.end)
                 if total_duration and total_duration > 0:
                     progress_bar = create_progress_bar(current_pos, int(total_duration))
-                    eta_seconds = (
-                        (elapsed / current_pos) * (total_duration - current_pos)
-                        if current_pos > 0
-                        else 0
-                    )
+                    eta_seconds = (elapsed / current_pos) * (total_duration - current_pos) if current_pos > 0 else 0
                     eta_str = f" | ETA: {int(eta_seconds)}s" if eta_seconds > 0 else ""
                     print(
                         f"    🎵 {progress_bar} {current_pos}s/{int(total_duration)}s{eta_str}",
@@ -145,6 +142,7 @@ def transcribe_audio(
 # ---------------------------------------------------------------------------
 # Legacy alias – kept so that old call-sites continue to work
 # ---------------------------------------------------------------------------
+
 
 def transcribe_with_feedback(
     model,

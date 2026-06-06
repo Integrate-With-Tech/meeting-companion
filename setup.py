@@ -51,14 +51,12 @@ setup(
         "dev": dev_requirements,
         "test": ["pytest>=7.0.0", "pytest-cov>=4.0.0"],
     },
-    
     # Console scripts
     entry_points={
         "console_scripts": [
             "video-transcribe=transcribe_batch:main",
         ],
     },
-    
     # Classifiers
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -68,7 +66,7 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -76,21 +74,19 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Text Processing :: Linguistic",
     ],
-    
     # Keywords
     keywords=[
-    "video",
-    "transcription",
-    "whisper",
-    "ai",
-    "speech-to-text",
-    "summarization",
-    "bart",
-    "machine-learning",
-    "nlp",
-    "console",
+        "video",
+        "transcription",
+        "whisper",
+        "ai",
+        "speech-to-text",
+        "summarization",
+        "bart",
+        "machine-learning",
+        "nlp",
+        "console",
     ],
-    
     # Project URLs
     project_urls={
         "Homepage": "https://github.com/sejalsheth/integrate-with-tech",
@@ -98,7 +94,6 @@ setup(
         "Issues": "https://github.com/sejalsheth/integrate-with-tech/issues",
         "Documentation": "https://github.com/sejalsheth/integrate-with-tech/blob/main/video-transcribe/README.md",
     },
-    
     # Package data
     include_package_data=True,
     zip_safe=False,

@@ -19,6 +19,7 @@ _summ = None  # cached transformers pipeline
 def _load_summarizer() -> None:
     global _summ
     from transformers import pipeline
+
     _summ = pipeline("summarization", model="facebook/bart-large-cnn", device_map="auto")
 
 
