@@ -34,8 +34,9 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure UTF-8 output on Windows so emoji characters don't cause UnicodeEncodeError
 if hasattr(sys.stdout, "reconfigure"):
@@ -103,6 +104,8 @@ from services.artifacts import (
     ensure_dirs,
     write_artifacts,
 )
+from services.notes_storage import build_generated_note_exports
+from services.teams_native import parse_vtt_segments
 
 # --------------------------- worker ---------------------------
 
@@ -869,6 +872,7 @@ def show_examples():
         ("⚡ Fast Testing Mode", "meeting-companion run --fast --input videos/ --output results/"),
         ("🔍 Select Files Manually", "meeting-companion run --select --input videos/ --output results/"),
         ("📄 Single File", "meeting-companion file --input myvideo.mp4"),
+        ("📝 Generate Notes from Transcript", "meeting-companion notes --transcript meeting.vtt --output notes/"),
         ("📂 Browse for File", "meeting-companion file --browse"),
         ("🗣️  Spanish Language", "meeting-companion run --language es --input videos/ --output results/"),
         ("🚫 Skip AI Summary", "meeting-companion run --no-summary --input videos/ --output results/"),
@@ -878,6 +882,145 @@ def show_examples():
     for description, command in examples:
         print(f"{Colors.GREEN}{description}{Colors.END}")
         print(f"   {Colors.CYAN}{command}{Colors.END}\n")
+
+
+def _split_sentences(text: str) -> List[str]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return []
+    parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+    return parts or [normalized]
+
+
+def _derive_meeting_title(transcript_path: Path, transcript_text: str) -> str:
+    for line in transcript_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            candidate = stripped.lstrip("#").strip()
+            if candidate:
+                return candidate
+    return transcript_path.stem.replace("_", " ").replace("-", " ").strip() or "Meeting"
+
+
+def _load_transcript_text(transcript_path: Path) -> Tuple[str, str]:
+    transcript_text = transcript_path.read_text(encoding="utf-8")
+    if transcript_path.suffix.lower() == ".vtt":
+        segments = parse_vtt_segments(transcript_text)
+        lines = []
+        for segment in segments:
+            if segment.speaker:
+                lines.append(f"{segment.speaker}: {segment.text}")
+            else:
+                lines.append(segment.text)
+        return "\n".join(lines).strip(), "teams_native"
+    return transcript_text.strip(), "uploaded_transcript"
+
+
+def _build_sections(transcript_text: str) -> Dict[str, List[str]]:
+    agenda: List[str] = []
+    action_items: List[str] = []
+    decisions: List[str] = []
+
+    for raw_line in transcript_text.splitlines():
+        line = raw_line.strip().lstrip("-").strip()
+        if not line:
+            continue
+        speaker_prefixed = re.match(
+            r"^[^:]{1,80}:\s*(agenda|topic|subject|action item|action|todo|next step|decision|decided|resolution):\s*(.+)$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if speaker_prefixed:
+            keyword = speaker_prefixed.group(1).lower()
+            value = speaker_prefixed.group(2).strip()
+            if keyword in {"agenda", "topic", "subject"}:
+                agenda.append(value)
+            elif keyword in {"action item", "action", "todo", "next step"}:
+                action_items.append(value)
+            else:
+                decisions.append(value)
+            continue
+        lowered = line.lower()
+        if lowered.startswith(("agenda:", "topic:", "subject:")):
+            agenda.append(line.split(":", 1)[1].strip())
+        elif lowered.startswith(("action item:", "action:", "todo:", "next step:")):
+            action_items.append(line.split(":", 1)[1].strip())
+        elif lowered.startswith(("decision:", "decided:", "resolution:")):
+            decisions.append(line.split(":", 1)[1].strip())
+
+    sentences = _split_sentences(transcript_text)
+    if not agenda and sentences:
+        agenda = sentences[: min(3, len(sentences))]
+    if not action_items and len(sentences) > 3:
+        action_items = sentences[3:6]
+    if not decisions and len(sentences) > 6:
+        decisions = sentences[6:9]
+
+    return {"agenda": agenda, "action_items": action_items, "decisions": decisions}
+
+
+def _render_notes_markdown(meeting_title: str, sections: Dict[str, List[str]]) -> str:
+    markdown_lines = [f"# {meeting_title}", "", "## Agenda"]
+    agenda = sections.get("agenda") or ["None captured."]
+    markdown_lines.extend(f"- {item}" for item in agenda)
+    markdown_lines.extend(["", "## Action Items"])
+    action_items = sections.get("action_items") or ["None captured."]
+    markdown_lines.extend(f"- {item}" for item in action_items)
+    markdown_lines.extend(["", "## Decisions"])
+    decisions = sections.get("decisions") or ["None captured."]
+    markdown_lines.extend(f"- {item}" for item in decisions)
+    markdown_lines.append("")
+    return "\n".join(markdown_lines)
+
+
+def generate_notes_from_transcript(args) -> int:
+    transcript_path = Path(args.transcript)
+    output_dir = Path(args.output)
+
+    if not transcript_path.exists():
+        print(f"{Colors.RED}❌ Transcript file not found: {transcript_path}{Colors.END}")
+        return 1
+
+    if transcript_path.suffix.lower() not in {".vtt", ".txt"}:
+        print(f"{Colors.RED}❌ Unsupported transcript format: {transcript_path.suffix}{Colors.END}")
+        return 1
+
+    transcript_text, transcript_source = _load_transcript_text(transcript_path)
+    if not transcript_text:
+        print(f"{Colors.RED}❌ Transcript is empty: {transcript_path}{Colors.END}")
+        return 1
+
+    meeting_title = _derive_meeting_title(transcript_path, transcript_text)
+    sections = _build_sections(transcript_text)
+    markdown_notes = _render_notes_markdown(meeting_title, sections)
+    structured_notes: Dict[str, Any] = {
+        "meeting_job_id": "cli-local",
+        "meeting_title": meeting_title,
+        "agenda": sections["agenda"],
+        "action_items": sections["action_items"],
+        "decisions": sections["decisions"],
+        "transcript_source": transcript_source,
+        "status": "completed",
+        "model_name": "cli-notes",
+        "model_version": "v1",
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "audit_status": "no_events",
+        "sharepoint_links": [],
+    }
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    exports = build_generated_note_exports(
+        meeting_date=datetime.now(timezone.utc).date(),
+        meeting_title=meeting_title,
+        markdown_notes=markdown_notes,
+        structured_notes=structured_notes,
+    )
+    for export in exports.values():
+        (output_dir / export.filename).write_text(export.text_content, encoding="utf-8")
+
+    print(f"{Colors.GREEN}✅ Notes generated in {output_dir.resolve()}{Colors.END}")
+    return 0
 
 
 def show_comprehensive_help():
@@ -973,6 +1116,11 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
         help="Process a single video file",
         description=f"{Colors.BOLD}Single File Mode{Colors.END}\n\nTranscribe one specific video file.",
     )
+    notes_cmd = sub.add_parser(
+        "notes",
+        help="Generate notes from transcript",
+        description=f"{Colors.BOLD}Notes Mode{Colors.END}\n\nGenerate notes from .vtt or .txt transcripts.",
+    )
 
     # Input/Output for batch mode
     io_group = run_cmd.add_argument_group("📁 Input/Output")
@@ -985,6 +1133,10 @@ Converts MP4 videos to accurate text transcripts with optional AI summaries.
     file_io_group.add_argument("--input", "-i", required=True, help="Video file to transcribe")
     file_io_group.add_argument("--output", "-o", help="Output directory (default: same as input file)")
     file_io_group.add_argument("--browse", action="store_true", help="Browse and select input file interactively")
+
+    notes_io_group = notes_cmd.add_argument_group("📝 Notes Generation")
+    notes_io_group.add_argument("--transcript", required=True, help="Path to transcript file (.vtt or .txt)")
+    notes_io_group.add_argument("--output", required=True, help="Directory where notes markdown/json will be written")
 
     # Quick presets
     preset_group = run_cmd.add_argument_group("🚀 Quick Presets")
@@ -1233,6 +1385,13 @@ def main():
         except KeyboardInterrupt:
             print(f"\n\n{Colors.YELLOW}⚠️  Processing interrupted by user{Colors.END}")
             sys.exit(1)
+        except Exception as e:
+            print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")
+            sys.exit(1)
+
+    elif args.mode == "notes":
+        try:
+            sys.exit(generate_notes_from_transcript(args))
         except Exception as e:
             print(f"\n{Colors.RED}💥 Unexpected error: {e}{Colors.END}")
             sys.exit(1)

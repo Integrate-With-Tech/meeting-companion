@@ -99,6 +99,14 @@ class TestTranscribeBatch(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parser.parse_args(["--help"])
 
+    def test_notes_argument_parser(self):
+        """Test notes mode parser configuration"""
+        parser = build_parser()
+        args = parser.parse_args(["notes", "--transcript", "meeting.vtt", "--output", "notes"])
+        self.assertEqual(args.mode, "notes")
+        self.assertEqual(args.transcript, "meeting.vtt")
+        self.assertEqual(args.output, "notes")
+
     def test_colors_disable(self):
         """Test color disabling functionality"""
         # Should not raise an error

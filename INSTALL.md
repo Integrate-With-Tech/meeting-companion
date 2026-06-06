@@ -101,6 +101,7 @@ meeting-companion --check-deps
 | `meeting-companion --interactive` | Interactive setup wizard          |
 | `meeting-companion run`           | Batch process directory of videos |
 | `meeting-companion file`          | Process single video file         |
+| `meeting-companion notes`         | Generate notes from transcript    |
 | `meeting-companion --check-deps`  | Validate system dependencies      |
 | `meeting-companion --show-config` | Display current configuration     |
 

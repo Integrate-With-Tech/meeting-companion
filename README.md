@@ -174,6 +174,7 @@ This is now a full-featured **console application** with interactive menus, conf
 | `meeting-companion --interactive` | 🧙‍♂️ Interactive setup wizard |
 | `meeting-companion run`           | 📁 Batch process directory  |
 | `meeting-companion file`          | 📄 Process single file      |
+| `meeting-companion notes`         | 📝 Generate notes from transcript |
 | `meeting-companion --guide`       | 📚 Complete usage guide     |
 | `meeting-companion --check-deps`  | 🔍 Verify dependencies      |
 | `meeting-companion --show-config` | ⚙️ View settings            |
@@ -204,6 +205,13 @@ meeting-companion file --input myvideo.mp4 --output results/
 
 # Browse and select file interactively
 meeting-companion file --browse
+```
+
+**Notes Validation (no Teams/web server):**
+
+```bash
+meeting-companion notes --transcript meeting.vtt --output notes/
+meeting-companion notes --transcript transcript.txt --output notes/
 ```
 
 ### 🌍 Language Options

@@ -70,6 +70,10 @@ meeting-companion run --select --input videos/ --output results/
 # Single file processing
 meeting-companion file --input video.mp4
 meeting-companion file --browse
+
+# Transcript-only notes validation
+meeting-companion notes --transcript meeting.vtt --output notes/
+meeting-companion notes --transcript transcript.txt --output notes/
 ```
 
 ### Quick Presets

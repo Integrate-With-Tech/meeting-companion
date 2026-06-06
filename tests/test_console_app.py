@@ -6,6 +6,8 @@ import unittest
 import subprocess
 import sys
 import os
+import json
+import tempfile
 from pathlib import Path
 
 
@@ -72,6 +74,70 @@ class TestConsoleApplication(unittest.TestCase):
         """Test file command help"""
         result = self.run_script(["file", "--help"], expect_success=False)
         self.assertIn("Single File", result.stdout)
+
+    def test_notes_help(self):
+        """Test notes command help"""
+        result = self.run_script(["notes", "--help"], expect_success=False)
+        self.assertIn("Notes Mode", result.stdout)
+        self.assertIn("--transcript", result.stdout)
+
+    def test_notes_command_with_plain_text_transcript(self):
+        """Test notes generation from plain text transcript"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            transcript_path = Path(temp_dir) / "weekly_sync.txt"
+            output_dir = Path(temp_dir) / "notes_output"
+            transcript_path.write_text(
+                "Agenda: Project roadmap review.\n"
+                "Action: Share updated timeline by Friday.\n"
+                "Decision: Keep launch date unchanged.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script(
+                ["notes", "--transcript", str(transcript_path), "--output", str(output_dir)],
+                expect_success=False,
+            )
+            self.assertEqual(result.returncode, 0)
+
+            json_files = list(output_dir.glob("*-notes.json"))
+            markdown_files = list(output_dir.glob("*-notes.md"))
+            self.assertEqual(len(json_files), 1)
+            self.assertEqual(len(markdown_files), 1)
+
+            payload = json.loads(json_files[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["transcript_source"], "uploaded_transcript")
+            self.assertEqual(payload["agenda"], ["Project roadmap review."])
+            self.assertEqual(payload["action_items"], ["Share updated timeline by Friday."])
+            self.assertEqual(payload["decisions"], ["Keep launch date unchanged."])
+
+    def test_notes_command_with_vtt_transcript(self):
+        """Test notes generation from Teams VTT transcript"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            transcript_path = Path(temp_dir) / "meeting.vtt"
+            output_dir = Path(temp_dir) / "notes_output"
+            transcript_path.write_text(
+                "WEBVTT\n\n"
+                "00:00:00.000 --> 00:00:02.000\n"
+                "<v Alex>Agenda: Sprint planning\n\n"
+                "00:00:02.000 --> 00:00:04.000\n"
+                "Priya: Action: Publish notes\n\n"
+                "00:00:04.000 --> 00:00:06.000\n"
+                "Decision: Start on Monday\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script(
+                ["notes", "--transcript", str(transcript_path), "--output", str(output_dir)],
+                expect_success=False,
+            )
+            self.assertEqual(result.returncode, 0)
+
+            json_files = list(output_dir.glob("*-notes.json"))
+            self.assertEqual(len(json_files), 1)
+            payload = json.loads(json_files[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["transcript_source"], "teams_native")
+            self.assertEqual(payload["action_items"], ["Publish notes"])
+            self.assertEqual(payload["decisions"], ["Start on Monday"])
 
     def test_invalid_command(self):
         """Test handling of invalid commands"""
