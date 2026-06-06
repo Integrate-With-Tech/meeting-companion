@@ -188,6 +188,13 @@ class TestMeetingJobRepository(unittest.TestCase):
         result = repo.create(MeetingJob(tenant_id="t1", source_type="teams_native", status="missing_source_artifact"))
         self.assertEqual(result["status"], "missing_source_artifact")
 
+    def test_create_authorization_failed_status(self):
+        row = self._make_row(status="authorization_failed")
+        client, chain = _mock_client(row)
+        repo = MeetingJobRepository(client)
+        result = repo.create(MeetingJob(tenant_id="t1", source_type="teams_native", status="authorization_failed"))
+        self.assertEqual(result["status"], "authorization_failed")
+
     def test_update_status_builds_correct_patch(self):
         row = self._make_row(status="completed")
         client, chain = _mock_client(row)
@@ -204,6 +211,13 @@ class TestMeetingJobRepository(unittest.TestCase):
         repo = MeetingJobRepository(client)
         with self.assertRaises(ValueError):
             repo.update_status("job-1", "nonexistent")
+
+    def test_update_status_authorization_failed_allowed(self):
+        row = self._make_row(status="authorization_failed")
+        client, chain = _mock_client(row)
+        repo = MeetingJobRepository(client)
+        result = repo.update_status("job-1", "authorization_failed", error_message="forbidden")
+        self.assertEqual(result["status"], "authorization_failed")
 
     def test_get_returns_row(self):
         row = self._make_row()

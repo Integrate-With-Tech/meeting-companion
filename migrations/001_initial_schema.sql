@@ -73,7 +73,8 @@ CREATE TYPE IF NOT EXISTS meeting_job_status AS ENUM (
     'processing',
     'completed',
     'failed',
-    'missing_source_artifact'
+    'missing_source_artifact',
+    'authorization_failed'
 );
 
 CREATE TABLE IF NOT EXISTS meeting_jobs (
@@ -95,7 +96,7 @@ CREATE TABLE IF NOT EXISTS meeting_jobs (
 COMMENT ON TABLE  meeting_jobs                     IS 'One row per meeting transcription/processing job.';
 COMMENT ON COLUMN meeting_jobs.meeting_id          IS 'Microsoft Teams meeting ID (nullable for uploaded artifacts).';
 COMMENT ON COLUMN meeting_jobs.source_type         IS 'Origin of the audio/transcript data.';
-COMMENT ON COLUMN meeting_jobs.status              IS 'Current processing status, including missing_source_artifact.';
+COMMENT ON COLUMN meeting_jobs.status              IS 'Current processing status, including missing_source_artifact and authorization_failed.';
 COMMENT ON COLUMN meeting_jobs.model_name          IS 'Whisper model name used for transcription (e.g. large-v3).';
 COMMENT ON COLUMN meeting_jobs.model_version       IS 'Model version string or checkpoint hash.';
 COMMENT ON COLUMN meeting_jobs.input_tokens        IS 'Summarization model input token count.';
