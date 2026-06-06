@@ -5,6 +5,7 @@ Integration tests for the console application
 import unittest
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 
@@ -19,7 +20,10 @@ class TestConsoleApplication(unittest.TestCase):
     def run_script(self, args, expect_success=True):
         """Helper to run the script with given arguments"""
         cmd = [sys.executable, str(self.script_path)] + args
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=30
+        )
 
         if expect_success and result.returncode != 0:
             self.fail(
