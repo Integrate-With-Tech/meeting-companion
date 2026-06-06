@@ -38,10 +38,10 @@ from services.db.repository import (
     _strip_nones,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _ok(data):
     """Return a SimpleNamespace that looks like a successful Supabase result."""
@@ -75,6 +75,7 @@ def _mock_client(return_row=None):
 # _strip_nones
 # ---------------------------------------------------------------------------
 
+
 class TestStripNones(unittest.TestCase):
     def test_removes_none_values(self):
         self.assertEqual(_strip_nones({"a": 1, "b": None, "c": "x"}), {"a": 1, "c": "x"})
@@ -90,6 +91,7 @@ class TestStripNones(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # TenantSettingsRepository
 # ---------------------------------------------------------------------------
+
 
 class TestTenantSettingsRepository(unittest.TestCase):
 
@@ -114,6 +116,7 @@ class TestTenantSettingsRepository(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # UserIdentityRepository
 # ---------------------------------------------------------------------------
+
 
 class TestUserIdentityRepository(unittest.TestCase):
 
@@ -144,6 +147,7 @@ class TestUserIdentityRepository(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # MeetingJobRepository
 # ---------------------------------------------------------------------------
+
 
 class TestMeetingJobRepository(unittest.TestCase):
 
@@ -181,9 +185,7 @@ class TestMeetingJobRepository(unittest.TestCase):
         row = self._make_row(status="missing_source_artifact")
         client, chain = _mock_client(row)
         repo = MeetingJobRepository(client)
-        result = repo.create(
-            MeetingJob(tenant_id="t1", source_type="teams_native", status="missing_source_artifact")
-        )
+        result = repo.create(MeetingJob(tenant_id="t1", source_type="teams_native", status="missing_source_artifact"))
         self.assertEqual(result["status"], "missing_source_artifact")
 
     def test_update_status_builds_correct_patch(self):
@@ -241,15 +243,14 @@ class TestMeetingJobRepository(unittest.TestCase):
 # MeetingArtifactRepository
 # ---------------------------------------------------------------------------
 
+
 class TestMeetingArtifactRepository(unittest.TestCase):
 
     def test_create_returns_row(self):
         row = {"id": "art-1", "meeting_job_id": "job-1", "artifact_type": "transcript", "storage_path": "/p"}
         client, chain = _mock_client(row)
         repo = MeetingArtifactRepository(client)
-        result = repo.create(
-            MeetingArtifact(meeting_job_id="job-1", artifact_type="transcript", storage_path="/p")
-        )
+        result = repo.create(MeetingArtifact(meeting_job_id="job-1", artifact_type="transcript", storage_path="/p"))
         self.assertEqual(result["id"], "art-1")
 
     def test_create_includes_checksum_and_size(self):
@@ -281,6 +282,7 @@ class TestMeetingArtifactRepository(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # GeneratedNotesRepository
 # ---------------------------------------------------------------------------
+
 
 class TestGeneratedNotesRepository(unittest.TestCase):
 
@@ -322,6 +324,7 @@ class TestGeneratedNotesRepository(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # SharePointUploadRepository
 # ---------------------------------------------------------------------------
+
 
 class TestSharePointUploadRepository(unittest.TestCase):
 
@@ -373,6 +376,7 @@ class TestSharePointUploadRepository(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # AuditEventRepository
 # ---------------------------------------------------------------------------
+
 
 class TestAuditEventRepository(unittest.TestCase):
 
@@ -428,11 +432,13 @@ class TestAuditEventRepository(unittest.TestCase):
 # Client tests
 # ---------------------------------------------------------------------------
 
+
 class TestClientModule(unittest.TestCase):
 
     def setUp(self):
         # Ensure cached client is cleared before each test
         from services.db import client as client_module
+
         client_module._reset_client()
 
     def test_get_client_raises_without_url(self):
@@ -461,6 +467,7 @@ class TestClientModule(unittest.TestCase):
 
     def test_get_client_caches_instance(self):
         from services.db import client as client_module
+
         fake_supabase_client = object()
 
         def fake_create(url, key):
@@ -478,6 +485,7 @@ class TestClientModule(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Model dataclass tests
 # ---------------------------------------------------------------------------
+
 
 class TestModels(unittest.TestCase):
 

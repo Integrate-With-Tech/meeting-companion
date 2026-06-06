@@ -47,24 +47,15 @@ def get_client() -> "Client":
         return _client  # type: ignore[return-value]
 
     if create_client is None:
-        raise ImportError(
-            "The 'supabase' package is required.  Install it with: "
-            "pip install supabase"
-        )
+        raise ImportError("The 'supabase' package is required. Install it with: pip install supabase")
 
     url = os.environ.get("SUPABASE_URL", "").strip()
     key = os.environ.get("SUPABASE_KEY", "").strip()
 
     if not url:
-        raise RuntimeError(
-            "SUPABASE_URL environment variable is not set.  "
-            "Set it to your Supabase project URL."
-        )
+        raise RuntimeError("SUPABASE_URL environment variable is not set. Set it to your Supabase project URL.")
     if not key:
-        raise RuntimeError(
-            "SUPABASE_KEY environment variable is not set.  "
-            "Set it to your Supabase service-role key."
-        )
+        raise RuntimeError("SUPABASE_KEY environment variable is not set. Set it to your Supabase service-role key.")
 
     _client = create_client(url, key)
     return _client  # type: ignore[return-value]
