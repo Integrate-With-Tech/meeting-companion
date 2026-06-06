@@ -36,6 +36,19 @@ class _FakeUIService:
                 "upload_status": "failed",
             },
         ]
+        self._profiles = {
+            "user-1": {"id": "user-1", "email": "alice@example.com", "display_name": "Alice"},
+        }
+        self._ms_connections = {
+            "conn-1": {
+                "id": "conn-1",
+                "owner_user_id": "user-1",
+                "microsoft_user_oid": "ms-oid-1",
+                "email": "alice@contoso.com",
+                "display_name": "Alice (MS)",
+                "tenant_id": "tenant-abc",
+            },
+        }
 
     def get_setup_settings(self, tenant_id):
         return self.saved.get(
@@ -113,6 +126,22 @@ class _FakeUIService:
             "content_type": "application/json; charset=utf-8",
         }
 
+    def get_user_profile(self, user_id):
+        return self._profiles.get(user_id)
+
+    def list_microsoft_connections(self, user_id):
+        return [c for c in self._ms_connections.values() if c["owner_user_id"] == user_id]
+
+    def check_microsoft_connected(self, user_id):
+        return bool(self.list_microsoft_connections(user_id))
+
+    def disconnect_microsoft(self, user_id, connection_id):
+        conn = self._ms_connections.get(connection_id)
+        if conn and conn["owner_user_id"] == user_id:
+            del self._ms_connections[connection_id]
+            return True
+        return False
+
 
 class TestNotesUIRoutes(unittest.TestCase):
     def setUp(self):
@@ -168,6 +197,158 @@ class TestNotesUIRoutes(unittest.TestCase):
         json_download = self.client.get("/notes/meetings/job-1/download/json?tenant_id=t-1")
         self.assertEqual(json_download.status_code, 200)
         self.assertIn("application/json", json_download.headers["content-type"])
+
+
+class TestAuthRoutes(unittest.TestCase):
+    def setUp(self):
+        self.service = _FakeUIService()
+        self.client = TestClient(create_app(data_service=self.service))
+
+    def test_sign_in_page_renders(self):
+        response = self.client.get("/auth/sign-in")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sign In", response.text)
+        self.assertIn("Magic Link", response.text)
+        self.assertIn("Social Login", response.text)
+
+    def test_sign_in_distinguishes_product_vs_microsoft_login(self):
+        response = self.client.get("/auth/sign-in")
+        self.assertIn("separate", response.text.lower())
+        self.assertIn("Microsoft", response.text)
+
+    def test_magic_link_post_shows_confirmation(self):
+        response = self.client.post("/auth/sign-in/magic-link", data={"email": "test@example.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("test@example.com", response.text)
+        self.assertIn("Magic link sent", response.text)
+
+    def test_account_page_shows_profile(self):
+        response = self.client.get("/auth/account?user_id=user-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("alice@example.com", response.text)
+        self.assertIn("Alice", response.text)
+
+    def test_account_page_shows_microsoft_connection(self):
+        response = self.client.get("/auth/account?user_id=user-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Connected", response.text)
+        self.assertIn("alice@contoso.com", response.text)
+        self.assertIn("Disconnect", response.text)
+
+    def test_account_page_no_microsoft_connection(self):
+        response = self.client.get("/auth/account?user_id=user-no-ms")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Not connected", response.text)
+        self.assertIn("Connect Microsoft Account", response.text)
+
+    def test_account_page_no_profile_shows_sign_in_link(self):
+        response = self.client.get("/auth/account?user_id=unknown-user")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Sign in", response.text)
+
+    def test_disconnect_microsoft_removes_connection(self):
+        response = self.client.post(
+            "/auth/microsoft/disconnect",
+            data={"user_id": "user-1", "connection_id": "conn-1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("disconnected successfully", response.text)
+        self.assertIn("Not connected", response.text)
+
+    def test_disconnect_microsoft_wrong_user_no_effect(self):
+        response = self.client.post(
+            "/auth/microsoft/disconnect",
+            data={"user_id": "other-user", "connection_id": "conn-1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        # connection still exists for user-1 even after wrong-user attempt
+        self.assertIn("conn-1", str(self.service._ms_connections))
+
+
+class TestMicrosoftConnectionGating(unittest.TestCase):
+    """Meeting detail and history pages gate Teams/SharePoint on MS connection."""
+
+    def setUp(self):
+        self.service = _FakeUIService()
+        self.client = TestClient(create_app(data_service=self.service))
+
+    def test_detail_teams_source_no_ms_shows_warning(self):
+        # viewer_id with no MS connection; transcript_source is teams_native
+        response = self.client.get("/notes/meetings/job-1?tenant_id=t-1&viewer_id=user-no-ms")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Microsoft account required", response.text)
+
+    def test_detail_teams_source_with_ms_no_warning(self):
+        response = self.client.get("/notes/meetings/job-1?tenant_id=t-1&viewer_id=user-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Microsoft account required", response.text)
+
+    def test_detail_sharepoint_section_visible_with_ms(self):
+        response = self.client.get("/notes/meetings/job-1?tenant_id=t-1&viewer_id=user-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("contoso.sharepoint.com", response.text)
+
+    def test_detail_sharepoint_section_gated_without_ms(self):
+        response = self.client.get("/notes/meetings/job-1?tenant_id=t-1&viewer_id=user-no-ms")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("contoso.sharepoint.com", response.text)
+        self.assertIn("Connect a Microsoft account", response.text)
+
+    def test_history_no_ms_shows_connect_banner(self):
+        response = self.client.get("/notes/history?viewer_id=user-no-ms")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Microsoft account not connected", response.text)
+
+    def test_history_with_ms_no_connect_banner(self):
+        response = self.client.get("/notes/history?viewer_id=user-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Microsoft account not connected", response.text)
+
+
+class TestNotesUIMicrosoftServiceMethods(unittest.TestCase):
+    """Unit tests for the new service methods on NotesUIService."""
+
+    def setUp(self):
+        self.service = _FakeUIService()
+
+    def test_get_user_profile_found(self):
+        profile = self.service.get_user_profile("user-1")
+        self.assertIsNotNone(profile)
+        self.assertEqual(profile["email"], "alice@example.com")
+
+    def test_get_user_profile_not_found(self):
+        self.assertIsNone(self.service.get_user_profile("unknown"))
+
+    def test_get_user_profile_empty_id(self):
+        self.assertIsNone(self.service.get_user_profile(""))
+
+    def test_list_microsoft_connections_returns_rows(self):
+        conns = self.service.list_microsoft_connections("user-1")
+        self.assertEqual(len(conns), 1)
+        self.assertEqual(conns[0]["id"], "conn-1")
+
+    def test_list_microsoft_connections_empty_user(self):
+        self.assertEqual(self.service.list_microsoft_connections(""), [])
+
+    def test_check_microsoft_connected_true(self):
+        self.assertTrue(self.service.check_microsoft_connected("user-1"))
+
+    def test_check_microsoft_connected_false(self):
+        self.assertFalse(self.service.check_microsoft_connected("user-no-ms"))
+
+    def test_disconnect_microsoft_success(self):
+        result = self.service.disconnect_microsoft("user-1", "conn-1")
+        self.assertTrue(result)
+        self.assertFalse(self.service.check_microsoft_connected("user-1"))
+
+    def test_disconnect_microsoft_wrong_user(self):
+        result = self.service.disconnect_microsoft("other-user", "conn-1")
+        self.assertFalse(result)
+        self.assertTrue(self.service.check_microsoft_connected("user-1"))
+
+    def test_disconnect_microsoft_missing_ids(self):
+        self.assertFalse(self.service.disconnect_microsoft("", "conn-1"))
+        self.assertFalse(self.service.disconnect_microsoft("user-1", ""))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,16 @@
   <p>Model Metadata: {{ detail.model_name }} {{ detail.model_version }}</p>
   <p>Audit Status: {{ detail.audit_status }}</p>
 
+  {% if detail.transcript_source == "teams_native" and not microsoft_connected %}
+  <p>
+    <strong>Microsoft account required.</strong>
+    Teams transcript ingestion needs a connected Microsoft account.
+    {% if viewer_id %}
+    <a href="/auth/account?user_id={{ viewer_id }}">Connect now</a>
+    {% endif %}
+  </p>
+  {% endif %}
+
   <h2>Agenda</h2>
   <ul>{% for item in detail.agenda %}<li>{{ item }}</li>{% endfor %}</ul>
 
@@ -21,12 +31,24 @@
   <h2>Decisions</h2>
   <ul>{% for item in detail.decisions %}<li>{{ item }}</li>{% endfor %}</ul>
 
-  <h2>SharePoint Links</h2>
+  <h2>SharePoint</h2>
+  {% if microsoft_connected %}
   <ul>
     {% for link in detail.sharepoint_links %}
     <li><a href="{{ link }}">{{ link }}</a></li>
     {% endfor %}
   </ul>
+  {% if not detail.sharepoint_links %}
+  <p>No SharePoint uploads yet.</p>
+  {% endif %}
+  {% else %}
+  <p>
+    Connect a Microsoft account to save notes to SharePoint.
+    {% if viewer_id %}
+    <a href="/auth/account?user_id={{ viewer_id }}">Connect now</a>
+    {% endif %}
+  </p>
+  {% endif %}
 
   <h2>Downloads</h2>
   <ul>

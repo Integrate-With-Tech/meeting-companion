@@ -19,8 +19,10 @@ from services.db.repository import (
     GeneratedNotesRepository,
     MeetingArtifactRepository,
     MeetingJobRepository,
+    MicrosoftConnectionRepository,
     SharePointUploadRepository,
     TenantSettingsRepository,
+    UserProfileRepository,
 )
 
 
@@ -77,6 +79,8 @@ class NotesUIService:
         self._artifacts = MeetingArtifactRepository(self._client)
         self._uploads = SharePointUploadRepository(self._client)
         self._audit = AuditEventRepository(self._client)
+        self._profiles = UserProfileRepository(self._client)
+        self._ms_connections = MicrosoftConnectionRepository(self._client)
 
     def get_setup_settings(self, tenant_id: str) -> Dict[str, Any]:
         row = self._tenant_settings.get_by_tenant(tenant_id) or {}
@@ -290,6 +294,36 @@ class NotesUIService:
             }
         raise ValueError(f"Unsupported format {fmt!r}")
 
+    def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return the profile row for *user_id*, or ``None`` if not found."""
+        if not user_id:
+            return None
+        return self._profiles.get(user_id)
+
+    def list_microsoft_connections(self, user_id: str) -> List[Dict[str, Any]]:
+        """Return all Microsoft connection rows for *user_id*."""
+        if not user_id:
+            return []
+        return self._ms_connections.list_by_user(user_id)
+
+    def check_microsoft_connected(self, user_id: str) -> bool:
+        """Return ``True`` if *user_id* has at least one Microsoft connection."""
+        return bool(self.list_microsoft_connections(user_id))
+
+    def disconnect_microsoft(self, user_id: str, connection_id: str) -> bool:
+        """Delete the Microsoft connection identified by *connection_id*.
+
+        Returns ``True`` if the row was owned by *user_id* and deleted, or
+        ``False`` if the row was not found or belongs to a different user.
+        """
+        if not user_id or not connection_id:
+            return False
+        conn = self._ms_connections.get(connection_id)
+        if not conn or str(conn.get("owner_user_id")) != user_id:
+            return False
+        self._ms_connections.delete(connection_id)
+        return True
+
 
 def create_app(data_service: Optional[Any] = None) -> FastAPI:
     app = FastAPI(title="Meeting Companion Notes UI")
@@ -388,6 +422,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
             filters=filters,
             limit=limit,
         )
+        microsoft_connected = _service().check_microsoft_connected(viewer_id)
         return templates.TemplateResponse(
             request=request,
             name="notes_history.html",
@@ -397,6 +432,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
                 "is_admin": is_admin,
                 "filters": filters,
                 "notes": notes,
+                "microsoft_connected": microsoft_connected,
             },
         )
 
@@ -416,10 +452,17 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         )
         if not detail:
             raise HTTPException(status_code=404, detail="Meeting notes not found")
+        microsoft_connected = _service().check_microsoft_connected(viewer_id)
         return templates.TemplateResponse(
             request=request,
             name="meeting_detail.html",
-            context={"tenant_id": tenant_id, "viewer_id": viewer_id, "is_admin": is_admin, "detail": detail},
+            context={
+                "tenant_id": tenant_id,
+                "viewer_id": viewer_id,
+                "is_admin": is_admin,
+                "detail": detail,
+                "microsoft_connected": microsoft_connected,
+            },
         )
 
     @app.get("/notes/meetings/{meeting_job_id}/download/{fmt}")
@@ -444,6 +487,57 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         headers = {"Content-Disposition": f'attachment; filename="{export["filename"]}"'}
         return Response(content=export["content"], media_type=export["content_type"], headers=headers)
+
+    @app.get("/auth/sign-in", response_class=HTMLResponse)
+    def sign_in_page(request: Request, magic_link_sent: bool = Query(False)) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="sign_in.html",
+            context={"magic_link_sent": magic_link_sent, "email": ""},
+        )
+
+    @app.post("/auth/sign-in/magic-link", response_class=HTMLResponse)
+    def send_magic_link(request: Request, email: str = Form(...)) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="sign_in.html",
+            context={"magic_link_sent": True, "email": email},
+        )
+
+    @app.get("/auth/account", response_class=HTMLResponse)
+    def account_page(request: Request, user_id: str = Query("")) -> HTMLResponse:
+        profile = _service().get_user_profile(user_id)
+        connections = _service().list_microsoft_connections(user_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="account.html",
+            context={
+                "user_id": user_id,
+                "profile": profile,
+                "microsoft_connections": connections,
+                "disconnected": False,
+            },
+        )
+
+    @app.post("/auth/microsoft/disconnect", response_class=HTMLResponse)
+    def disconnect_microsoft_post(
+        request: Request,
+        user_id: str = Form(...),
+        connection_id: str = Form(...),
+    ) -> HTMLResponse:
+        _service().disconnect_microsoft(user_id, connection_id)
+        profile = _service().get_user_profile(user_id)
+        connections = _service().list_microsoft_connections(user_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="account.html",
+            context={
+                "user_id": user_id,
+                "profile": profile,
+                "microsoft_connections": connections,
+                "disconnected": True,
+            },
+        )
 
     return app
 
