@@ -21,9 +21,7 @@ class TestConsoleApplication(unittest.TestCase):
         """Helper to run the script with given arguments"""
         cmd = [sys.executable, str(self.script_path)] + args
         env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=30
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=30)
 
         if expect_success and result.returncode != 0:
             self.fail(
