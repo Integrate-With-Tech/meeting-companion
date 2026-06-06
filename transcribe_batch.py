@@ -35,7 +35,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 # Console styling
 class Colors:
@@ -74,167 +74,24 @@ def print_banner():
 """
     print(banner)
 
-# --------------------------- formatting ---------------------------
+# --------------------------- service imports ---------------------------
+# The core transcription, summarization, and artifact-writing logic now
+# lives in dedicated service modules so that CLI and future server/worker
+# code share the same implementation.
 
-def srt_timestamp(t: float) -> str:
-    h = int(t // 3600); m = int((t % 3600) // 60); s = int(t % 60); ms = int((t - int(t)) * 1000)
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
-# --------------------------- summarization ---------------------------
-
-_summ = None
-def _load_summarizer():
-    global _summ
-    from transformers import pipeline
-    _summ = pipeline("summarization", model="facebook/bart-large-cnn", device_map="auto")
-
-def _chunk(text: str, max_chars: int = 3500):
-    import re as _re
-    text = _re.sub(r"\s+", " ", text).strip()
-    if len(text) <= max_chars: return [text]
-    sents = _re.split(r"(?<=[.!?])\s+", text)
-    chunks, cur = [], ""
-    for s in sents:
-        if len(cur) + len(s) + 1 > max_chars and cur:
-            chunks.append(cur.strip()); cur = s
-        else:
-            cur = f"{cur} {s}" if cur else s
-    if cur: chunks.append(cur.strip())
-    return chunks
-
-def summarize_text(full_text: str, max_sentences: int = 8):
-    if not full_text.strip(): return []
-    if _summ is None: _load_summarizer()
-    first = []
-    for c in _chunk(full_text, 3500):
-        first.append(_summ(c, max_length=128, min_length=40, do_sample=False)[0]["summary_text"])
-    merged = " ".join(first)
-    out2 = _summ(merged, max_length=128, min_length=40, do_sample=False)[0]["summary_text"]
-    import re as _re
-    sents = [s.strip() for s in _re.split(r"(?<=[.!?])\s+", out2) if s.strip()]
-    return sents[:max_sentences]
-
-# --------------------------- whisper ---------------------------
-
-_WM = None
-def load_whisper(model_size: str, compute_type: str):
-    global _WM
-    if _WM is None:
-        from faster_whisper import WhisperModel as _WM_
-        _WM = _WM_
-    return _WM(model_size, compute_type=compute_type)
-
-def create_progress_bar(current: int, total: int, width: int = 30) -> str:
-    """Create a simple progress bar"""
-    if total == 0:
-        return "[" + "?" * width + "]"
-    
-    filled = int(width * current / total)
-    bar = "█" * filled + "░" * (width - filled)
-    percentage = int(100 * current / total)
-    return f"[{bar}] {percentage:3d}%"
-
-def transcribe_with_feedback(model, media_path: Path, language: str, beam_size: int, progress_timeout: int):
-    """
-    Enhanced transcription with visual progress feedback.
-    Streams segments and prints progress with time estimates.
-    Aborts with RuntimeError if no new audio seconds for progress_timeout.
-    """
-    seg_iter, info = model.transcribe(
-        str(media_path),
-        language=None if language == "auto" else language,
-        beam_size=beam_size,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=400),
-    )
-    
-    segments: List[Tuple[float, float, str]] = []
-    parts: List[str] = []
-    last_audio_s = 0.0
-    last_wall = time.time()
-    last_printed_bucket = -1
-    start_time = time.time()
-    
-    # Try to get total duration for better progress tracking
-    total_duration = getattr(info, 'duration', None)
-
-    for seg in seg_iter:
-        text = seg.text.strip()
-        segments.append((seg.start, seg.end, text))
-        parts.append(text)
-
-        # Enhanced progress print every ~10s of audio
-        bucket = int(seg.end) // 10
-        if bucket != last_printed_bucket:
-            elapsed = time.time() - start_time
-            current_pos = int(seg.end)
-            
-            # Create progress display
-            if total_duration and total_duration > 0:
-                progress_bar = create_progress_bar(current_pos, int(total_duration))
-                eta_seconds = (elapsed / current_pos) * (total_duration - current_pos) if current_pos > 0 else 0
-                eta_str = f" | ETA: {int(eta_seconds)}s" if eta_seconds > 0 else ""
-                print(f"    🎵 {progress_bar} {current_pos}s/{int(total_duration)}s{eta_str}", flush=True)
-            else:
-                # Fallback when duration unknown
-                print(f"    🎵 Processed: {current_pos}s | Elapsed: {int(elapsed)}s", flush=True)
-            
-            last_printed_bucket = bucket
-
-        # Update progress tracking
-        if seg.end > last_audio_s + 0.5:
-            last_audio_s = seg.end
-            last_wall = time.time()
-
-        # Watchdog: no progress for too long
-        if progress_timeout > 0 and (time.time() - last_wall) > progress_timeout:
-            print(f"    ⚠️  No progress for {progress_timeout}s - aborting", flush=True)
-            raise RuntimeError("progress-timeout")
-
-    return segments, " ".join(parts), info
-
-# --------------------------- helpers ---------------------------
-
-def outputs_present(out_dir: Path) -> bool:
-    # Consider completed if both transcript and summary exist
-    return (out_dir / "transcript.txt").exists() and (out_dir / "summary.md").exists()
-
-def ensure_dirs(out_dir: Path):
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-def write_artifacts(out_dir: Path, segments: List[Tuple[float, float, str]], full_text: str, stem: str, do_summary: bool, summary_max: int):
-    # transcript.txt
-    with (out_dir / "transcript.txt").open("w", encoding="utf-8") as f:
-        for (start, end, text) in segments:
-            f.write(f"[{srt_timestamp(start)} - {srt_timestamp(end)}] {text}\n")
-
-    # captions.srt
-    with (out_dir / "captions.srt").open("w", encoding="utf-8") as f:
-        for i, (start, end, text) in enumerate(segments, 1):
-            f.write(f"{i}\n{srt_timestamp(start)} --> {srt_timestamp(end)}\n{text.strip()}\n\n")
-
-    # captions.vtt
-    with (out_dir / "captions.vtt").open("w", encoding="utf-8") as f:
-        f.write("WEBVTT\n\n")
-        for (start, end, text) in segments:
-            f.write(f"{srt_timestamp(start).replace(',', '.')} --> {srt_timestamp(end).replace(',', '.')}\n{text.strip()}\n\n")
-
-    # full.txt
-    (out_dir / "full.txt").write_text(full_text, encoding="utf-8")
-
-    # summary.md
-    if do_summary:
-        bullets = summarize_text(full_text, max_sentences=summary_max)
-        with (out_dir / "summary.md").open("w", encoding="utf-8") as f:
-            f.write(f"# Summary: {stem}\n\n")
-            if bullets:
-                for b in bullets:
-                    f.write(f"- {b}\n")
-            else:
-                f.write("- No content to summarize.\n")
-    else:
-        if not (out_dir / "summary.md").exists():
-            (out_dir / "summary.md").write_text("# Summary\n\n", encoding="utf-8")
+from services.transcription import (
+    srt_timestamp,
+    load_whisper,
+    create_progress_bar,
+    transcribe_with_feedback,
+    transcribe_audio,
+)
+from services.summarization import summarize_text
+from services.artifacts import (
+    outputs_present,
+    ensure_dirs,
+    write_artifacts,
+)
 
 # --------------------------- worker ---------------------------
 
