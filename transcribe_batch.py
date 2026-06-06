@@ -36,7 +36,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Ensure UTF-8 output on Windows so emoji characters don't cause UnicodeEncodeError
 if hasattr(sys.stdout, "reconfigure"):
@@ -892,6 +892,19 @@ def _split_sentences(text: str) -> List[str]:
     return parts or [normalized]
 
 
+# Keep speaker-prefixed keyword extraction bounded so we do not treat long free-form text as names.
+MAX_SPEAKER_NAME_LENGTH = 80
+# When transcript lines are not explicitly tagged (Agenda/Action/Decision), use sentence chunks of this size.
+FALLBACK_SECTION_SENTENCE_COUNT = 3
+AGENDA_KEYWORDS = ("agenda", "topic", "subject")
+ACTION_KEYWORDS = ("action item", "action", "todo", "next step")
+DECISION_KEYWORDS = ("decision", "decided", "resolution")
+ALL_SECTION_KEYWORDS = AGENDA_KEYWORDS + ACTION_KEYWORDS + DECISION_KEYWORDS
+CLI_MEETING_JOB_ID = "cli-local"
+CLI_MODEL_NAME = "cli-notes"
+CLI_MODEL_VERSION = "v1"
+
+
 def _derive_meeting_title(transcript_path: Path, transcript_text: str) -> str:
     for line in transcript_text.splitlines():
         stripped = line.strip()
@@ -926,35 +939,39 @@ def _build_sections(transcript_text: str) -> Dict[str, List[str]]:
         if not line:
             continue
         speaker_prefixed = re.match(
-            r"^[^:]{1,80}:\s*(agenda|topic|subject|action item|action|todo|next step|decision|decided|resolution):\s*(.+)$",
+            rf"^[^:]{{1,{MAX_SPEAKER_NAME_LENGTH}}}:\s*"
+            rf"({'|'.join(ALL_SECTION_KEYWORDS)}):\s*(.+)$",
             line,
             flags=re.IGNORECASE,
         )
         if speaker_prefixed:
             keyword = speaker_prefixed.group(1).lower()
             value = speaker_prefixed.group(2).strip()
-            if keyword in {"agenda", "topic", "subject"}:
+            if keyword in AGENDA_KEYWORDS:
                 agenda.append(value)
-            elif keyword in {"action item", "action", "todo", "next step"}:
+            elif keyword in ACTION_KEYWORDS:
                 action_items.append(value)
             else:
                 decisions.append(value)
             continue
         lowered = line.lower()
-        if lowered.startswith(("agenda:", "topic:", "subject:")):
+        if lowered.startswith(tuple(f"{keyword}:" for keyword in AGENDA_KEYWORDS)):
             agenda.append(line.split(":", 1)[1].strip())
-        elif lowered.startswith(("action item:", "action:", "todo:", "next step:")):
+        elif lowered.startswith(tuple(f"{keyword}:" for keyword in ACTION_KEYWORDS)):
             action_items.append(line.split(":", 1)[1].strip())
-        elif lowered.startswith(("decision:", "decided:", "resolution:")):
+        elif lowered.startswith(tuple(f"{keyword}:" for keyword in DECISION_KEYWORDS)):
             decisions.append(line.split(":", 1)[1].strip())
 
     sentences = _split_sentences(transcript_text)
+    first_break = FALLBACK_SECTION_SENTENCE_COUNT
+    second_break = first_break + FALLBACK_SECTION_SENTENCE_COUNT
+    third_break = second_break + FALLBACK_SECTION_SENTENCE_COUNT
     if not agenda and sentences:
-        agenda = sentences[: min(3, len(sentences))]
-    if not action_items and len(sentences) > 3:
-        action_items = sentences[3:6]
-    if not decisions and len(sentences) > 6:
-        decisions = sentences[6:9]
+        agenda = sentences[: min(first_break, len(sentences))]
+    if not action_items and len(sentences) > first_break:
+        action_items = sentences[first_break:second_break]
+    if not decisions and len(sentences) > second_break:
+        decisions = sentences[second_break:third_break]
 
     return {"agenda": agenda, "action_items": action_items, "decisions": decisions}
 
@@ -993,16 +1010,17 @@ def generate_notes_from_transcript(args) -> int:
     meeting_title = _derive_meeting_title(transcript_path, transcript_text)
     sections = _build_sections(transcript_text)
     markdown_notes = _render_notes_markdown(meeting_title, sections)
-    structured_notes: Dict[str, Any] = {
-        "meeting_job_id": "cli-local",
+    # Keep payload aligned with service download/storage schema for like-for-like CLI validation.
+    structured_notes: Dict[str, object] = {
+        "meeting_job_id": CLI_MEETING_JOB_ID,
         "meeting_title": meeting_title,
         "agenda": sections["agenda"],
         "action_items": sections["action_items"],
         "decisions": sections["decisions"],
         "transcript_source": transcript_source,
         "status": "completed",
-        "model_name": "cli-notes",
-        "model_version": "v1",
+        "model_name": CLI_MODEL_NAME,
+        "model_version": CLI_MODEL_VERSION,
         "prompt_tokens": None,
         "completion_tokens": None,
         "audit_status": "no_events",
