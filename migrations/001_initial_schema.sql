@@ -98,8 +98,8 @@ COMMENT ON COLUMN meeting_jobs.source_type         IS 'Origin of the audio/trans
 COMMENT ON COLUMN meeting_jobs.status              IS 'Current processing status, including missing_source_artifact.';
 COMMENT ON COLUMN meeting_jobs.model_name          IS 'Whisper model name used for transcription (e.g. large-v3).';
 COMMENT ON COLUMN meeting_jobs.model_version       IS 'Model version string or checkpoint hash.';
-COMMENT ON COLUMN meeting_jobs.input_tokens        IS 'Summarisation model input token count.';
-COMMENT ON COLUMN meeting_jobs.output_tokens       IS 'Summarisation model output token count.';
+COMMENT ON COLUMN meeting_jobs.input_tokens        IS 'Summarization model input token count.';
+COMMENT ON COLUMN meeting_jobs.output_tokens       IS 'Summarization model output token count.';
 COMMENT ON COLUMN meeting_jobs.error_message       IS 'Human-readable error detail when status = failed.';
 
 CREATE INDEX IF NOT EXISTS idx_meeting_jobs_tenant_id  ON meeting_jobs (tenant_id);
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS generated_notes (
 );
 
 COMMENT ON TABLE  generated_notes                        IS 'AI-generated summaries/notes for a meeting job.';
-COMMENT ON COLUMN generated_notes.model_name             IS 'Summarisation model name (e.g. facebook/bart-large-cnn).';
+COMMENT ON COLUMN generated_notes.model_name             IS 'Summarization model name (e.g. facebook/bart-large-cnn).';
 COMMENT ON COLUMN generated_notes.model_version          IS 'Model version or checkpoint identifier.';
 COMMENT ON COLUMN generated_notes.prompt_tokens          IS 'Number of tokens in the summarisation prompt.';
 COMMENT ON COLUMN generated_notes.completion_tokens      IS 'Number of tokens in the generated output.';
