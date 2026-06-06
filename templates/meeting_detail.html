@@ -6,11 +6,18 @@
 </head>
 <body>
   <h1>{{ detail.meeting_title }}</h1>
-  <p>Transcript Source: {{ detail.transcript_source }}</p>
-  <p>Processing Status: {{ detail.status }}</p>
+  <p>Transcript Source: {{ detail.transcript_source_label }}</p>
+  <p>Processing Status: {{ detail.status_label }}</p>
   <p>Upload Status: {{ detail.upload_status }}</p>
   <p>Model Metadata: {{ detail.model_name }} {{ detail.model_version }}</p>
   <p>Audit Status: {{ detail.audit_status }}</p>
+
+  {% if detail.status_message.body %}
+  <p>
+    <strong>{{ detail.status_message.title }}.</strong>
+    {{ detail.status_message.body }}
+  </p>
+  {% endif %}
 
   {% if detail.transcript_source == "teams_native" and not microsoft_connected %}
   <p>

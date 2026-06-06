@@ -102,6 +102,8 @@ MEETING_JOB_STATUSES = frozenset(
         "processing",
         "completed",
         "failed",
+        "scheduled_bot_capture",
+        "capture_unavailable",
         "missing_source_artifact",
         "authorization_failed",
     }

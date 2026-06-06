@@ -199,6 +199,20 @@ class TestMeetingJobRepository(unittest.TestCase):
         result = repo.create(MeetingJob(tenant_id="t1", source_type="teams_native", status="authorization_failed"))
         self.assertEqual(result["status"], "authorization_failed")
 
+    def test_create_scheduled_bot_capture_status(self):
+        row = self._make_row(status="scheduled_bot_capture")
+        client, chain = _mock_client(row)
+        repo = MeetingJobRepository(client)
+        result = repo.create(MeetingJob(tenant_id="t1", source_type="bot_capture", status="scheduled_bot_capture"))
+        self.assertEqual(result["status"], "scheduled_bot_capture")
+
+    def test_create_capture_unavailable_status(self):
+        row = self._make_row(status="capture_unavailable")
+        client, chain = _mock_client(row)
+        repo = MeetingJobRepository(client)
+        result = repo.create(MeetingJob(tenant_id="t1", source_type="bot_capture", status="capture_unavailable"))
+        self.assertEqual(result["status"], "capture_unavailable")
+
     def test_update_status_builds_correct_patch(self):
         row = self._make_row(status="completed")
         client, chain = _mock_client(row)
@@ -222,6 +236,13 @@ class TestMeetingJobRepository(unittest.TestCase):
         repo = MeetingJobRepository(client)
         result = repo.update_status("job-1", "authorization_failed", error_message="forbidden")
         self.assertEqual(result["status"], "authorization_failed")
+
+    def test_update_status_scheduled_bot_capture_allowed(self):
+        row = self._make_row(status="scheduled_bot_capture")
+        client, chain = _mock_client(row)
+        repo = MeetingJobRepository(client)
+        result = repo.update_status("job-1", "scheduled_bot_capture")
+        self.assertEqual(result["status"], "scheduled_bot_capture")
 
     def test_get_returns_row(self):
         row = self._make_row()

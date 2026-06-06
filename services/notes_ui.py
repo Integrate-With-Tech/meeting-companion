@@ -28,6 +28,24 @@ from services.db.repository import (
 
 SUPPORTED_SOCIAL_PROVIDERS = frozenset({"google", "github"})
 
+_SOURCE_LABELS = {
+    "teams_native": "Teams native transcript",
+    "uploaded_media": "Uploaded audio/video",
+    "uploaded_transcript": "Uploaded transcript",
+    "bot_capture": "Visible bot capture fallback",
+}
+
+_STATUS_LABELS = {
+    "pending": "Pending",
+    "processing": "Processing",
+    "completed": "Completed",
+    "failed": "Failed",
+    "scheduled_bot_capture": "Scheduled bot capture",
+    "capture_unavailable": "Capture unavailable",
+    "missing_source_artifact": "Missing source artifact",
+    "authorization_failed": "Authorization failed",
+}
+
 
 def _slugify(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9]+", "-", value.strip()).strip("-").lower()
@@ -71,6 +89,59 @@ def _build_upload_status(rows: List[Dict[str, Any]]) -> str:
     if all(status == "uploaded" for status in statuses):
         return "uploaded"
     return "pending"
+
+
+def _source_label(source_type: str) -> str:
+    return _SOURCE_LABELS.get(source_type, source_type or "Unknown")
+
+
+def _status_label(status: str) -> str:
+    return _STATUS_LABELS.get(status, status or "Unknown")
+
+
+def _status_message(status: str) -> Dict[str, str]:
+    if status == "scheduled_bot_capture":
+        return {
+            "title": "Visible bot capture scheduled",
+            "body": (
+                "This meeting is still in the future. If a native Teams transcript is not available, a visible bot/media "
+                "capture fallback can be used, and the captured media should be transcribed through the existing Whisper pipeline."
+            ),
+        }
+    if status == "capture_unavailable":
+        return {
+            "title": "Future capture unavailable",
+            "body": (
+                "This meeting is still in the future, but visible bot/media capture is not available yet for this workflow. "
+                "Use native Teams artifacts when available or upload media/transcripts later."
+            ),
+        }
+    if status == "missing_source_artifact":
+        return {
+            "title": "Source artifact missing",
+            "body": (
+                "This meeting has already passed and no transcript, recording, or uploaded source artifact was found. "
+                "Visible bot capture cannot be scheduled retroactively."
+            ),
+        }
+    return {"title": _status_label(status), "body": ""}
+
+
+def _decorate_note_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    decorated = dict(row)
+    decorated["status_label"] = _status_label(str(row.get("status") or ""))
+    decorated["transcript_source_label"] = _source_label(str(row.get("transcript_source") or ""))
+    return decorated
+
+
+def _decorate_note_detail(detail: Dict[str, Any]) -> Dict[str, Any]:
+    decorated = dict(detail)
+    status = str(detail.get("status") or "")
+    transcript_source = str(detail.get("transcript_source") or "")
+    decorated["status_label"] = _status_label(status)
+    decorated["transcript_source_label"] = _source_label(transcript_source)
+    decorated["status_message"] = _status_message(status)
+    return decorated
 
 
 class NotesUIService:
@@ -224,7 +295,7 @@ class NotesUIService:
                 metadata={"result_count": len(filtered), "is_admin": is_admin},
             )
         )
-        return filtered
+        return [_decorate_note_row(row) for row in filtered]
 
     def _group_rows_by_job_id(self, table_name: str, job_ids: List[str]) -> Dict[str, List[Dict[str, Any]]]:
         if not job_ids:
@@ -273,25 +344,27 @@ class NotesUIService:
                 metadata={"is_admin": is_admin},
             )
         )
-        return {
-            "meeting_job_id": meeting_job_id,
-            "meeting_title": meeting_title,
-            "meeting_date": str(job.get("created_at") or "")[:10],
-            "agenda": sections.get("agenda", []),
-            "action_items": sections.get("action items", []),
-            "decisions": sections.get("decisions", []),
-            "sharepoint_links": sharepoint_links,
-            "transcript_source": str(job.get("source_type") or ""),
-            "status": str(job.get("status") or ""),
-            "model_name": notes.get("model_name") or job.get("model_name") or "",
-            "model_version": notes.get("model_version") or job.get("model_version") or "",
-            "prompt_tokens": notes.get("prompt_tokens"),
-            "completion_tokens": notes.get("completion_tokens"),
-            "audit_status": "events_recorded" if audit_events else "no_events",
-            "artifacts": artifacts,
-            "content": content,
-            "upload_status": _build_upload_status(uploads),
-        }
+        return _decorate_note_detail(
+            {
+                "meeting_job_id": meeting_job_id,
+                "meeting_title": meeting_title,
+                "meeting_date": str(job.get("created_at") or "")[:10],
+                "agenda": sections.get("agenda", []),
+                "action_items": sections.get("action items", []),
+                "decisions": sections.get("decisions", []),
+                "sharepoint_links": sharepoint_links,
+                "transcript_source": str(job.get("source_type") or ""),
+                "status": str(job.get("status") or ""),
+                "model_name": notes.get("model_name") or job.get("model_name") or "",
+                "model_version": notes.get("model_version") or job.get("model_version") or "",
+                "prompt_tokens": notes.get("prompt_tokens"),
+                "completion_tokens": notes.get("completion_tokens"),
+                "audit_status": "events_recorded" if audit_events else "no_events",
+                "artifacts": artifacts,
+                "content": content,
+                "upload_status": _build_upload_status(uploads),
+            }
+        )
 
     def build_download(self, detail: Dict[str, Any], fmt: str) -> Dict[str, str]:
         meeting_date = detail.get("meeting_date") or datetime.now(timezone.utc).date().isoformat()
@@ -531,6 +604,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
             filters=filters,
             limit=limit,
         )
+        notes = [_decorate_note_row(note) for note in notes]
         microsoft_connected = _service().check_microsoft_connected(viewer_id)
         return templates.TemplateResponse(
             request=request,
@@ -561,6 +635,7 @@ def create_app(data_service: Optional[Any] = None) -> FastAPI:
         )
         if not detail:
             raise HTTPException(status_code=404, detail="Meeting notes not found")
+        detail = _decorate_note_detail(detail)
         microsoft_connected = _service().check_microsoft_connected(viewer_id)
         return templates.TemplateResponse(
             request=request,

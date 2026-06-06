@@ -83,6 +83,55 @@ class TestIngestTeamsNativeArtifacts(unittest.TestCase):
         jobs.update_status.assert_any_call("j1", "missing_source_artifact")
         artifacts.create.assert_not_called()
 
+    def test_schedules_bot_capture_for_future_meeting_when_enabled(self):
+        graph = MagicMock()
+        graph.get_transcript_vtt.return_value = None
+        graph.list_recording_artifacts.return_value = []
+        jobs, artifacts, audits = self._repos()
+
+        result = ingest_teams_native_artifacts(
+            meeting_id="m1",
+            meeting_job_id="j1",
+            tenant_id="t1",
+            meeting_completed=False,
+            bot_capture_enabled=True,
+            graph_client=graph,
+            jobs_repo=jobs,
+            artifacts_repo=artifacts,
+            audit_repo=audits,
+        )
+
+        self.assertEqual(result["status"], "scheduled_bot_capture")
+        self.assertEqual(result["source"], "bot_capture")
+        jobs.update_status.assert_any_call("j1", "scheduled_bot_capture")
+        event_types = [call.args[0].event_type for call in audits.append.call_args_list]
+        self.assertIn("meeting_job.scheduled_bot_capture", event_types)
+        artifacts.create.assert_not_called()
+
+    def test_marks_future_capture_unavailable_when_bot_capture_disabled(self):
+        graph = MagicMock()
+        graph.get_transcript_vtt.return_value = None
+        graph.list_recording_artifacts.return_value = []
+        jobs, artifacts, audits = self._repos()
+
+        result = ingest_teams_native_artifacts(
+            meeting_id="m1",
+            meeting_job_id="j1",
+            tenant_id="t1",
+            meeting_completed=False,
+            graph_client=graph,
+            jobs_repo=jobs,
+            artifacts_repo=artifacts,
+            audit_repo=audits,
+        )
+
+        self.assertEqual(result["status"], "capture_unavailable")
+        self.assertEqual(result["source"], "bot_capture")
+        jobs.update_status.assert_any_call("j1", "capture_unavailable")
+        event_types = [call.args[0].event_type for call in audits.append.call_args_list]
+        self.assertIn("meeting_job.capture_unavailable", event_types)
+        artifacts.create.assert_not_called()
+
     def test_marks_authorization_failed_on_permission_errors(self):
         graph = MagicMock()
         graph.get_transcript_vtt.side_effect = TeamsGraphPermissionError("forbidden")
